@@ -8,6 +8,107 @@ Broncode: `server/model/*.model.js`.
 
 ---
 
+## Schema
+
+```mermaid
+erDiagram
+  USER {
+    ObjectId _id PK
+    string name
+    string email UK
+    string pw
+    string roles
+    number loginCount
+    string lastLogin
+    boolean active
+    date createdAt
+    date updatedAt
+  }
+
+  PROJECT {
+    ObjectId _id PK
+    string title
+    string type
+    string glasfusionTechnique
+    string glasfusionSpeed
+    string notes
+    number kwhUsage
+    number costPrice
+    string ownerEmail FK
+    date deletedAt
+    string deletedBy
+    date createdAt
+    date updatedAt
+  }
+
+  PROJECT_LABEL {
+    string name
+    string color
+  }
+
+  STEP {
+    ObjectId _id PK
+    string title
+    string type
+    string glasfusionTechnique
+    string glasfusionSpeed
+    string notes
+    number kwhUsage
+    number costPrice
+    date deletedAt
+    string deletedBy
+    date createdAt
+    date updatedAt
+  }
+
+  PHOTO {
+    ObjectId _id PK
+    ObjectId fileId FK
+    string filename
+    string originalName
+    string mimetype
+    number size
+    number thumbsUp
+    string thumbedBy
+  }
+
+  LABEL {
+    ObjectId _id PK
+    string name
+    string nameKey UK
+    string color
+    string createdBy
+    date createdAt
+    date updatedAt
+  }
+
+  GRIDFS {
+    ObjectId _id PK
+    string filename
+    string contentType
+    number length
+  }
+
+  SESSION {
+    string _id PK
+    object session
+    date expires
+  }
+
+  USER ||--o{ PROJECT : "ownerEmail"
+  PROJECT ||--o{ PROJECT_LABEL : "labels embedded"
+  PROJECT ||--o{ STEP : "steps embedded"
+  PROJECT ||--o{ PHOTO : "photos embedded"
+  STEP ||--o{ PHOTO : "photos embedded"
+  PROJECT_LABEL }o--o| LABEL : "name/color catalogus"
+  PHOTO }o--|| GRIDFS : "fileId"
+  USER ||--o{ SESSION : "session.email"
+```
+
+Embedded documenten (`Step`, `Photo`, `PROJECT_LABEL`) zitten in het `projects`-document; `LABEL`, `USER`, GridFS en sessies zijn aparte collections.
+
+---
+
 ## Collections
 
 | Collection | Model | Beschrijving |
@@ -111,17 +212,3 @@ Labels op een project zijn een kopie `{ name, color }`. Bij opslaan wordt de cat
 | Stap | `deletedAt` / `deletedBy` op step | Stap + stapfoto’s weg |
 
 Publieke API toont geen soft-deleted projecten of stappen. Eigenaar/admin ziet prullenbak in de bewerk-UI.
-
----
-
-## Relaties (overzicht)
-
-```mermaid
-erDiagram
-  User ||--o{ Project : "ownerEmail"
-  Project ||--o{ Step : "embedded"
-  Project ||--o{ Photo : "embedded"
-  Step ||--o{ Photo : "embedded"
-  Project }o--o{ Label : "labels name/color"
-  Photo }o--|| GridFS : "fileId"
-```
