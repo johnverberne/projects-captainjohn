@@ -20,6 +20,7 @@ const PhotoSchema = new Schema(
     mimetype: String,
     size: Number,
     url: String,
+    thumbsUp: { type: Number, default: 0, min: 0 },
   },
   { _id: true }
 );

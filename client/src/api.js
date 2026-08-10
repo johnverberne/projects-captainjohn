@@ -34,6 +34,12 @@ export function addPhotos(id, formData) {
   });
 }
 
+export function thumbPhoto(projectId, photoId) {
+  return request(`/api/projects/${projectId}/photos/${photoId}/thumb`, {
+    method: "POST",
+  });
+}
+
 export function deleteProject(id) {
   return request(`/api/projects/${id}`, { method: "DELETE" });
 }

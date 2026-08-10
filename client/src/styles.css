@@ -348,6 +348,10 @@ h2 {
   box-shadow: 0 0 0 4px rgba(47, 107, 79, 0.15);
 }
 
+.photo-tile {
+  position: relative;
+}
+
 .photo-thumb {
   appearance: none;
   border: 0;
@@ -367,6 +371,52 @@ h2 {
   object-fit: cover;
   display: block;
   background: var(--paper-deep);
+}
+
+.thumb-chip,
+.lightbox-thumb {
+  appearance: none;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--sea);
+  background: rgba(255, 252, 246, 0.95);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.thumb-chip:disabled,
+.lightbox-thumb:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.thumb-icon {
+  width: 1em;
+  height: 1em;
+  display: block;
+  flex-shrink: 0;
+}
+
+.thumb-chip {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 0.8rem;
+}
+
+.lightbox-thumb {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 1.05rem;
 }
 
 .lightbox {

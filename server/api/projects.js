@@ -42,6 +42,7 @@ function mapPhotos(files) {
     mimetype: file.mimetype,
     size: file.size,
     url: `/uploads/${file.filename}`,
+    thumbsUp: 0,
   }));
 }
 
@@ -134,6 +135,22 @@ router.post("/:id/photos", upload.array("photos", 20), async (req, res) => {
       return res.status(400).json({ error: "Geen foto's ontvangen" });
     }
     project.photos.push(...mapPhotos(req.files));
+    await project.save();
+    res.json(project);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post("/:id/photos/:photoId/thumb", async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: "Project niet gevonden" });
+
+    const photo = project.photos.id(req.params.photoId);
+    if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
+
+    photo.thumbsUp = (photo.thumbsUp || 0) + 1;
     await project.save();
     res.json(project);
   } catch (error) {

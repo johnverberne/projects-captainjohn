@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { addPhotos, deleteProject, getProject } from "../api";
+import { addPhotos, deleteProject, getProject, thumbPhoto } from "../api";
 import {
   typeLabel,
   TECHNIQUE_LABELS,
@@ -16,6 +16,7 @@ const project = ref(null);
 const loading = ref(true);
 const error = ref("");
 const uploading = ref(false);
+const liking = ref(false);
 const viewerPhoto = ref(null);
 
 function openPhoto(photo) {
@@ -24,6 +25,27 @@ function openPhoto(photo) {
 
 function closePhoto() {
   viewerPhoto.value = null;
+}
+
+function syncViewerPhoto() {
+  if (!viewerPhoto.value || !project.value) return;
+  viewerPhoto.value =
+    project.value.photos.find((p) => p._id === viewerPhoto.value._id) || null;
+}
+
+async function giveThumb(photo, event) {
+  event?.stopPropagation();
+  if (!photo?._id || liking.value) return;
+  liking.value = true;
+  error.value = "";
+  try {
+    project.value = await thumbPhoto(route.params.id, photo._id);
+    syncViewerPhoto();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    liking.value = false;
+  }
 }
 
 function onKeydown(event) {
@@ -109,15 +131,34 @@ async function remove() {
       <div>
         <h2>Foto’s ({{ project.photos?.length || 0 }})</h2>
         <div v-if="project.photos?.length" class="photo-grid" style="margin-top: 10px">
-          <button
+          <div
             v-for="photo in project.photos"
             :key="photo._id"
-            type="button"
-            class="photo-thumb"
-            @click="openPhoto(photo)"
+            class="photo-tile"
           >
-            <img :src="photo.url" :alt="photo.originalName" />
-          </button>
+            <button
+              type="button"
+              class="photo-thumb"
+              @click="openPhoto(photo)"
+            >
+              <img :src="photo.url" :alt="photo.originalName" />
+            </button>
+            <button
+              type="button"
+              class="thumb-chip"
+              :disabled="liking"
+              :aria-label="`Duimpje geven, nu ${photo.thumbsUp || 0}`"
+              @click="giveThumb(photo, $event)"
+            >
+              <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                />
+              </svg>
+              <span>{{ photo.thumbsUp || 0 }}</span>
+            </button>
+          </div>
         </div>
         <p v-else class="muted" style="margin-top: 8px">Nog geen foto’s.</p>
       </div>
@@ -138,6 +179,21 @@ async function remove() {
           :src="viewerPhoto.url"
           :alt="viewerPhoto.originalName"
         />
+        <button
+          type="button"
+          class="lightbox-thumb"
+          :disabled="liking"
+          :aria-label="`Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`"
+          @click="giveThumb(viewerPhoto, $event)"
+        >
+          <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+            />
+          </svg>
+          <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
+        </button>
       </div>
 
       <div class="file-drop">
