@@ -15,6 +15,7 @@ const GLASFUSION_SPEEDS = ["fast", "medium", "slow", "ultra-slow"];
 
 const PhotoSchema = new Schema(
   {
+    fileId: { type: Schema.Types.ObjectId, required: false },
     filename: String,
     originalName: String,
     mimetype: String,
