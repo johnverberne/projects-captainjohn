@@ -29,6 +29,15 @@ const upload = multer({
   },
 });
 
+function parseOptionalNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(String(value).replace(",", "."));
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error("Kilowattverbruik en kostprijs moeten geldige getallen ≥ 0 zijn");
+  }
+  return n;
+}
+
 function parseBody(body) {
   return {
     title: (body.title || "").trim(),
@@ -36,6 +45,8 @@ function parseBody(body) {
     glasfusionTechnique: body.glasfusionTechnique || undefined,
     glasfusionSpeed: body.glasfusionSpeed || undefined,
     notes: body.notes || "",
+    kwhUsage: parseOptionalNumber(body.kwhUsage),
+    costPrice: parseOptionalNumber(body.costPrice),
   };
 }
 
@@ -130,6 +141,8 @@ router.put("/:id", upload.array("photos", 20), async (req, res) => {
     project.glasfusionTechnique = data.glasfusionTechnique;
     project.glasfusionSpeed = data.glasfusionSpeed;
     if (typeof req.body.notes === "string") project.notes = data.notes;
+    if (req.body.kwhUsage !== undefined) project.kwhUsage = data.kwhUsage;
+    if (req.body.costPrice !== undefined) project.costPrice = data.costPrice;
 
     if (req.files?.length) {
       project.photos.push(...(await storePhotos(req.files)));

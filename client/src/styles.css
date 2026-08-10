@@ -130,11 +130,46 @@ h2 {
   gap: 14px;
 }
 
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .field label {
   display: block;
   font-size: 0.85rem;
   font-weight: 700;
   margin-bottom: 6px;
+  color: var(--sea);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stat {
+  background: #fffdf8;
+  border: 1px solid rgba(26, 58, 58, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+.stat strong {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.15rem;
   color: var(--sea);
 }
 

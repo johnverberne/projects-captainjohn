@@ -7,6 +7,8 @@ import {
   TECHNIQUE_LABELS,
   SPEED_LABELS,
   formatDate,
+  formatKwh,
+  formatEuro,
 } from "../labels";
 
 const route = useRoute();
@@ -121,6 +123,20 @@ async function remove() {
         <h1 style="margin-top: 10px">{{ project.title }}</h1>
         <p class="lead">{{ subtitle }}</p>
         <p class="muted">Gestart {{ formatDate(project.createdAt) }}</p>
+      </div>
+
+      <div
+        v-if="project.kwhUsage != null || project.costPrice != null"
+        class="stats-row"
+      >
+        <div v-if="project.kwhUsage != null" class="stat">
+          <span class="stat-label">Verbruik</span>
+          <strong>{{ formatKwh(project.kwhUsage) }}</strong>
+        </div>
+        <div v-if="project.costPrice != null" class="stat">
+          <span class="stat-label">Kostprijs</span>
+          <strong>{{ formatEuro(project.costPrice) }}</strong>
+        </div>
       </div>
 
       <div v-if="project.notes">

@@ -17,6 +17,8 @@ const type = ref("");
 const glasfusionTechnique = ref("");
 const glasfusionSpeed = ref("");
 const notes = ref("");
+const kwhUsage = ref("");
+const costPrice = ref("");
 const files = ref([]);
 const previews = ref([]);
 const saving = ref(false);
@@ -77,6 +79,8 @@ async function submit() {
     form.append("title", title.value.trim());
     form.append("type", type.value);
     form.append("notes", notes.value);
+    form.append("kwhUsage", kwhUsage.value);
+    form.append("costPrice", costPrice.value);
     if (isGlasfusion.value) {
       form.append("glasfusionTechnique", glasfusionTechnique.value);
       form.append("glasfusionSpeed", glasfusionSpeed.value);
@@ -187,6 +191,33 @@ async function submit() {
             ×
           </button>
         </div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="kwhUsage">Kilowattverbruik (kWh)</label>
+        <input
+          id="kwhUsage"
+          v-model="kwhUsage"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="0.01"
+          placeholder="Bijv. 12.5"
+        />
+      </div>
+      <div class="field">
+        <label for="costPrice">Kostprijs (€)</label>
+        <input
+          id="costPrice"
+          v-model="costPrice"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="0.01"
+          placeholder="Bijv. 45.00"
+        />
       </div>
     </div>
 

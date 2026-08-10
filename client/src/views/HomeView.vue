@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { listProjects } from "../api";
-import { typeLabel, formatDate } from "../labels";
+import { typeLabel, formatDate, formatKwh, formatEuro } from "../labels";
 
 const projects = ref([]);
 const loading = ref(true);
@@ -64,6 +64,12 @@ onMounted(async () => {
             · {{ project.photos?.length || 0 }} foto{{
               (project.photos?.length || 0) === 1 ? "" : "'s"
             }}
+            <template v-if="project.kwhUsage != null">
+              · {{ formatKwh(project.kwhUsage) }}
+            </template>
+            <template v-if="project.costPrice != null">
+              · {{ formatEuro(project.costPrice) }}
+            </template>
           </p>
         </div>
       </router-link>

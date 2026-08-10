@@ -34,3 +34,18 @@ export function formatDate(value) {
     minute: "2-digit",
   });
 }
+
+export function formatKwh(value) {
+  if (value === null || value === undefined || value === "") return "";
+  return `${Number(value).toLocaleString("nl-NL", {
+    maximumFractionDigits: 2,
+  })} kWh`;
+}
+
+export function formatEuro(value) {
+  if (value === null || value === undefined || value === "") return "";
+  return Number(value).toLocaleString("nl-NL", {
+    style: "currency",
+    currency: "EUR",
+  });
+}

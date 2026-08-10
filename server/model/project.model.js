@@ -41,6 +41,8 @@ const ProjectSchema = new Schema(
       required: false,
     },
     notes: { type: String, default: "" },
+    kwhUsage: { type: Number, min: 0, default: null },
+    costPrice: { type: Number, min: 0, default: null },
     photos: [PhotoSchema],
   },
   {
