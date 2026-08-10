@@ -63,3 +63,25 @@ export function formatEuro(value) {
     currency: "EUR",
   });
 }
+
+export function labelChipStyle(color) {
+  const hex = String(color || "#2a5554").replace("#", "");
+  const full =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : hex;
+  if (full.length !== 6) {
+    return { background: "#2a5554", color: "#fffdf8" };
+  }
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return {
+    background: `#${full}`,
+    color: luminance > 0.62 ? "#1c2422" : "#fffdf8",
+  };
+}

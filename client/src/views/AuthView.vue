@@ -1,10 +1,11 @@
 <script setup>
-import { ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { resetLogin } from "../api";
 import { useAuth } from "../auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuth();
 
 const tab = ref("login");
@@ -15,6 +16,13 @@ const reason = ref("");
 const error = ref("");
 const success = ref("");
 const saving = ref(false);
+
+onMounted(() => {
+  const ret = String(route.query.return || "").trim();
+  if (ret.startsWith("/") && !ret.startsWith("//")) {
+    auth.returnUrl.value = ret;
+  }
+});
 
 watch(tab, () => {
   error.value = "";
@@ -35,7 +43,12 @@ async function submitLogin() {
   saving.value = true;
   try {
     await auth.login(email.value, password.value);
-    router.replace(auth.returnUrl.value || "/");
+    const target = auth.returnUrl.value || "/bewerken";
+    if (target.startsWith("/api")) {
+      window.location.replace(target);
+      return;
+    }
+    router.replace(target);
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -94,8 +107,10 @@ async function submitReset() {
 <template>
   <section class="panel stack">
     <div>
-      <h1>Account</h1>
-      <p class="lead">Inloggen, toegang aanvragen of wachtwoord resetten.</p>
+      <h1>Inloggen om te bewerken</h1>
+      <p class="lead">
+        Bekijken kan zonder account. Hier log je in om projecten te wijzigen.
+      </p>
     </div>
 
     <div class="auth-tabs auth-tabs-3">
@@ -144,6 +159,9 @@ async function submitReset() {
       <button class="btn btn-primary btn-block" :disabled="saving" @click="submitLogin">
         {{ saving ? "Bezig…" : "Inloggen" }}
       </button>
+      <router-link class="btn btn-secondary btn-block" to="/">
+        Terug naar publieke weergave
+      </router-link>
     </template>
 
     <template v-else-if="tab === 'register'">

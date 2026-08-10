@@ -23,8 +23,17 @@ const PhotoSchema = new Schema(
     size: Number,
     url: String,
     thumbsUp: { type: Number, default: 0, min: 0 },
+    thumbedBy: { type: [String], default: [] },
   },
   { _id: true }
+);
+
+const ProjectLabelSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    color: { type: String, required: true, trim: true },
+  },
+  { _id: false }
 );
 
 function applyGlasfusionValidation(doc) {
@@ -61,6 +70,8 @@ const StepSchema = new Schema(
     notes: { type: String, default: "" },
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: null },
     photos: [PhotoSchema],
   },
   { timestamps: true }
@@ -89,6 +100,9 @@ const ProjectSchema = new Schema(
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
     ownerEmail: { type: String, index: true, default: null },
+    deletedAt: { type: Date, default: null, index: true },
+    deletedBy: { type: String, default: null },
+    labels: { type: [ProjectLabelSchema], default: [] },
     photos: [PhotoSchema],
     steps: [StepSchema],
   },

@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import LabelPicker from "../components/LabelPicker.vue";
+import PhotoUploadPicker from "../components/PhotoUploadPicker.vue";
 import { createProject, getMeta } from "../api";
 import { TYPE_LABELS, TECHNIQUE_LABELS, SPEED_LABELS } from "../labels";
 
@@ -10,6 +12,7 @@ const meta = ref({
   types: Object.keys(TYPE_LABELS),
   glasfusionTechniques: Object.keys(TECHNIQUE_LABELS),
   glasfusionSpeeds: Object.keys(SPEED_LABELS),
+  labels: [],
 });
 
 const title = ref("");
@@ -19,6 +22,7 @@ const glasfusionSpeed = ref("");
 const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
+const projectLabels = ref([]);
 const files = ref([]);
 const previews = ref([]);
 const saving = ref(false);
@@ -81,6 +85,7 @@ async function submit() {
     form.append("notes", notes.value);
     form.append("kwhUsage", kwhUsage.value);
     form.append("costPrice", costPrice.value);
+    form.append("labels", JSON.stringify(projectLabels.value || []));
     if (isGlasfusion.value) {
       form.append("glasfusionTechnique", glasfusionTechnique.value);
       form.append("glasfusionSpeed", glasfusionSpeed.value);
@@ -89,7 +94,7 @@ async function submit() {
       form.append("photos", file);
     }
     const project = await createProject(form);
-    router.replace(`/project/${project._id}`);
+    router.replace(`/bewerken/project/${project._id}`);
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -168,17 +173,7 @@ async function submit() {
 
     <div class="field">
       <label>Foto’s</label>
-      <div class="file-drop">
-        <strong>Tik om foto’s te kiezen</strong>
-        <span class="muted">Meerdere foto’s mogelijk · camera of galerij</span>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          capture="environment"
-          @change="onFiles"
-        />
-      </div>
+      <PhotoUploadPicker title="Foto’s toevoegen" @change="onFiles" />
       <div v-if="previews.length" class="photo-grid" style="margin-top: 12px">
         <div v-for="(preview, index) in previews" :key="preview.url" style="position: relative">
           <img :src="preview.url" :alt="preview.name" />
@@ -221,6 +216,8 @@ async function submit() {
       </div>
     </div>
 
+    <LabelPicker v-model="projectLabels" :catalog="meta.labels || []" />
+
     <div class="field">
       <label for="notes">Notities (optioneel)</label>
       <textarea id="notes" v-model="notes" placeholder="Afmetingen, kleuren, klant…" />
@@ -232,7 +229,7 @@ async function submit() {
       <button class="btn btn-primary" :disabled="saving" @click="submit">
         {{ saving ? "Opslaan…" : "Project opslaan" }}
       </button>
-      <router-link class="btn btn-secondary" to="/">Annuleren</router-link>
+      <router-link class="btn btn-secondary" to="/bewerken">Annuleren</router-link>
     </div>
   </section>
 </template>
