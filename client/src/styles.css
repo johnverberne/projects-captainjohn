@@ -87,6 +87,22 @@ a {
   margin-top: 4px;
 }
 
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+}
+
+.home-logo {
+  width: min(220px, 48vw);
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
 .panel {
   background: rgba(255, 252, 246, 0.82);
   border: 1px solid rgba(26, 58, 58, 0.08);

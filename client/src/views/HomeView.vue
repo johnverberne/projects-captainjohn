@@ -20,8 +20,14 @@ onMounted(async () => {
 
 <template>
   <section class="panel stack">
-    <div>
-      <h1>Projecten</h1>
+    <div class="home-hero">
+      <img
+        class="home-logo"
+        src="/logo-captainjohn.png"
+        alt="CaptainJohn — navigeert tussen projecten"
+        width="220"
+        height="220"
+      />
       <p class="lead">Start een nieuw atelierproject vanaf je telefoon.</p>
     </div>
 
