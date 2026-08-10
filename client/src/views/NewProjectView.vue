@@ -1,0 +1,207 @@
+<script setup>
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { createProject, getMeta } from "../api";
+import { TYPE_LABELS, TECHNIQUE_LABELS, SPEED_LABELS } from "../labels";
+
+const router = useRouter();
+
+const meta = ref({
+  types: Object.keys(TYPE_LABELS),
+  glasfusionTechniques: Object.keys(TECHNIQUE_LABELS),
+  glasfusionSpeeds: Object.keys(SPEED_LABELS),
+});
+
+const title = ref("");
+const type = ref("");
+const glasfusionTechnique = ref("");
+const glasfusionSpeed = ref("");
+const notes = ref("");
+const files = ref([]);
+const previews = ref([]);
+const saving = ref(false);
+const error = ref("");
+
+const isGlasfusion = computed(() => type.value === "glasfusion");
+
+onMounted(async () => {
+  try {
+    meta.value = await getMeta();
+  } catch {
+    /* fallback labels already set */
+  }
+});
+
+function selectType(value) {
+  type.value = value;
+  if (value !== "glasfusion") {
+    glasfusionTechnique.value = "";
+    glasfusionSpeed.value = "";
+  }
+}
+
+function onFiles(event) {
+  const selected = Array.from(event.target.files || []);
+  files.value = [...files.value, ...selected];
+  previews.value = files.value.map((file) => ({
+    name: file.name,
+    url: URL.createObjectURL(file),
+  }));
+  event.target.value = "";
+}
+
+function removeFile(index) {
+  URL.revokeObjectURL(previews.value[index]?.url);
+  files.value.splice(index, 1);
+  previews.value.splice(index, 1);
+}
+
+async function submit() {
+  error.value = "";
+  if (!title.value.trim()) {
+    error.value = "Geef het project een titel.";
+    return;
+  }
+  if (!type.value) {
+    error.value = "Kies een projectsoort.";
+    return;
+  }
+  if (isGlasfusion.value && (!glasfusionTechnique.value || !glasfusionSpeed.value)) {
+    error.value = "Kies techniek (slump/fuse/cast) en type (fast…ultra slow).";
+    return;
+  }
+
+  saving.value = true;
+  try {
+    const form = new FormData();
+    form.append("title", title.value.trim());
+    form.append("type", type.value);
+    form.append("notes", notes.value);
+    if (isGlasfusion.value) {
+      form.append("glasfusionTechnique", glasfusionTechnique.value);
+      form.append("glasfusionSpeed", glasfusionSpeed.value);
+    }
+    for (const file of files.value) {
+      form.append("photos", file);
+    }
+    const project = await createProject(form);
+    router.replace(`/project/${project._id}`);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<template>
+  <section class="panel stack">
+    <div>
+      <h1>Nieuw project</h1>
+      <p class="lead">Titel, soort, eventueel glasfusion-opties en foto’s.</p>
+    </div>
+
+    <div class="field">
+      <label for="title">Titel</label>
+      <input
+        id="title"
+        v-model="title"
+        type="text"
+        placeholder="Bijv. Blauw schaaltje"
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="field">
+      <label>Soort project</label>
+      <div class="choice-grid">
+        <button
+          v-for="value in meta.types"
+          :key="value"
+          type="button"
+          class="choice"
+          :class="{ active: type === value }"
+          @click="selectType(value)"
+        >
+          {{ TYPE_LABELS[value] || value }}
+        </button>
+      </div>
+    </div>
+
+    <template v-if="isGlasfusion">
+      <div class="field">
+        <label>Techniek</label>
+        <div class="choice-grid">
+          <button
+            v-for="value in meta.glasfusionTechniques"
+            :key="value"
+            type="button"
+            class="choice"
+            :class="{ active: glasfusionTechnique === value }"
+            @click="glasfusionTechnique = value"
+          >
+            {{ TECHNIQUE_LABELS[value] || value }}
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Type (snelheid)</label>
+        <div class="choice-grid">
+          <button
+            v-for="value in meta.glasfusionSpeeds"
+            :key="value"
+            type="button"
+            class="choice"
+            :class="{ active: glasfusionSpeed === value }"
+            @click="glasfusionSpeed = value"
+          >
+            {{ SPEED_LABELS[value] || value }}
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <div class="field">
+      <label>Foto’s</label>
+      <div class="file-drop">
+        <strong>Tik om foto’s te kiezen</strong>
+        <span class="muted">Meerdere foto’s mogelijk · camera of galerij</span>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          capture="environment"
+          @change="onFiles"
+        />
+      </div>
+      <div v-if="previews.length" class="photo-grid" style="margin-top: 12px">
+        <div v-for="(preview, index) in previews" :key="preview.url" style="position: relative">
+          <img :src="preview.url" :alt="preview.name" />
+          <button
+            type="button"
+            class="btn btn-danger"
+            style="position: absolute; top: 4px; right: 4px; padding: 4px 8px; font-size: 0.75rem"
+            @click="removeFile(index)"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="notes">Notities (optioneel)</label>
+      <textarea id="notes" v-model="notes" placeholder="Afmetingen, kleuren, klant…" />
+    </div>
+
+    <p v-if="error" class="error">{{ error }}</p>
+
+    <div class="actions">
+      <button class="btn btn-primary" :disabled="saving" @click="submit">
+        {{ saving ? "Opslaan…" : "Project opslaan" }}
+      </button>
+      <router-link class="btn btn-secondary" to="/">Annuleren</router-link>
+    </div>
+  </section>
+</template>

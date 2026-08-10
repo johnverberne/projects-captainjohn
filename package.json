@@ -1,0 +1,30 @@
+{
+  "name": "projects-captainjohn",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Captain John project tracker – Vue + Express + MongoDB",
+  "type": "commonjs",
+  "scripts": {
+    "install:all": "npm install && npm --prefix ./client install",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "nodemon server/server.js",
+    "client": "npm --prefix ./client run dev",
+    "build": "npm --prefix ./client run build",
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "connect-history-api-fallback": "^2.0.0",
+    "connect-mongo": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "mongoose": "^8.13.1",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.1.0"
+  }
+}
