@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { health } from "./api";
 import { useAuth } from "./auth";
@@ -7,6 +7,10 @@ import { useAuth } from "./auth";
 const router = useRouter();
 const auth = useAuth();
 const mongoOk = ref(false);
+
+const homeLink = computed(() =>
+  auth.isLoggedIn.value ? "/bewerken" : "/"
+);
 
 onMounted(async () => {
   try {
@@ -19,14 +23,14 @@ onMounted(async () => {
 
 async function onLogout() {
   await auth.logout();
-  router.push("/auth");
+  router.push("/");
 }
 </script>
 
 <template>
   <div class="app-shell">
     <header class="brand-bar">
-      <router-link to="/" class="brand">
+      <router-link :to="homeLink" class="brand">
         Captain John
         <span>atelier projecten</span>
       </router-link>
@@ -44,6 +48,13 @@ async function onLogout() {
             Uitloggen
           </button>
         </template>
+        <router-link
+          v-else
+          class="btn btn-secondary btn-small"
+          to="/inloggen"
+        >
+          Inloggen
+        </router-link>
       </div>
     </header>
     <router-view />

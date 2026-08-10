@@ -1,5 +1,6 @@
-const express = require("express");
+﻿const express = require("express");
 const fs = require("fs");
+const crypto = require("crypto");
 const multer = require("multer");
 const Project = require("../model/project.model");
 const {
@@ -17,11 +18,26 @@ const {
   serializeProject,
 } = require("../services/photoStorage");
 const { isAuthenticated } = require("../middleware/auth");
+const {
+  parseLabelsInput,
+  upsertCatalogLabels,
+  listCatalogLabels,
+} = require("../services/labels");
 
 const router = express.Router();
 
-function canAccessProject(project, email) {
+function isAdminUser(req) {
+  const email = String(req.session?.email || "").toLowerCase();
+  const adminEmail = String(
+    process.env.ADMIN_EMAIL || "john.verberne@gmail.com"
+  ).toLowerCase();
+  const roles = req.session?.roles || [];
+  return email === adminEmail || roles.includes("admin");
+}
+
+function canAccessProject(project, email, req) {
   if (!project) return false;
+  if (isAdminUser(req)) return true;
   if (!project.ownerEmail) return true;
   return project.ownerEmail === email;
 }
@@ -32,7 +48,21 @@ function projectQueryForUser(email) {
   };
 }
 
-router.use(isAuthenticated);
+function notDeletedFilter() {
+  return {
+    $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+  };
+}
+
+function assertActiveProject(project, res) {
+  if (project?.deletedAt) {
+    res.status(400).json({
+      error: "Dit project is verwijderd. Alleen een admin kan het herstellen.",
+    });
+    return false;
+  }
+  return true;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -49,7 +79,7 @@ function parseOptionalNumber(value) {
   if (value === undefined || value === null || value === "") return null;
   const n = Number(String(value).replace(",", "."));
   if (!Number.isFinite(n) || n < 0) {
-    throw new Error("Kilowattverbruik en kostprijs moeten geldige getallen ≥ 0 zijn");
+    throw new Error("Kilowattverbruik en kostprijs moeten geldige getallen â‰¥ 0 zijn");
   }
   return n;
 }
@@ -63,6 +93,7 @@ function parseBody(body) {
     notes: body.notes || "",
     kwhUsage: parseOptionalNumber(body.kwhUsage),
     costPrice: parseOptionalNumber(body.costPrice),
+    labels: parseLabelsInput(body.labels),
   };
 }
 
@@ -70,11 +101,103 @@ function claimOwner(project, email) {
   if (!project.ownerEmail) project.ownerEmail = email;
 }
 
-async function loadAccessibleProject(req, res) {
+function isStepDeleted(step) {
+  return Boolean(step?.deletedAt);
+}
+
+function assertActiveStep(step, res) {
+  if (isStepDeleted(step)) {
+    res.status(400).json({
+      error: "Deze stap is verwijderd. Herstel hem eerst of verwijder hem definitief.",
+    });
+    return false;
+  }
+  return true;
+}
+
+function peekVoterId(req) {
+  if (req.session?.email) return `user:${req.session.email}`;
+  if (req.session?.voterId) return `anon:${req.session.voterId}`;
+  return null;
+}
+
+function ensureVoterId(req) {
+  if (req.session?.email) return `user:${req.session.email}`;
+  if (!req.session.voterId) {
+    req.session.voterId = crypto.randomUUID();
+  }
+  return `anon:${req.session.voterId}`;
+}
+
+function applyThumb(photo, voterId) {
+  if (!Array.isArray(photo.thumbedBy)) photo.thumbedBy = [];
+  if (photo.thumbedBy.includes(voterId)) {
+    return { ok: false, already: true };
+  }
+  photo.thumbedBy.push(voterId);
+  photo.thumbsUp = photo.thumbedBy.length;
+  return { ok: true, already: false };
+}
+
+function serializeForClient(project, req) {
+  const obj = serializeProject(project, { voterId: peekVoterId(req) });
+  const canSeeDeletedSteps =
+    Boolean(req.session?.email) &&
+    canAccessProject(project, req.session.email, req);
+  if (!canSeeDeletedSteps) {
+    obj.steps = (obj.steps || []).filter((step) => !step.deletedAt);
+  }
+  return obj;
+}
+
+/** Publiek lezen; verwijderde projecten alleen voor eigenaar/admin. */
+async function loadReadableProject(
+  req,
+  res,
+  { allowDeleted = false, requireActive = false } = {}
+) {
   const project = await Project.findById(req.params.id);
-  if (!project || !canAccessProject(project, req.session.email)) {
+  if (!project) {
     res.status(404).json({ error: "Project niet gevonden" });
     return null;
+  }
+  if (project.deletedAt) {
+    if (requireActive) {
+      assertActiveProject(project, res);
+      return null;
+    }
+    const canSeeDeleted =
+      allowDeleted &&
+      req.session?.email &&
+      canAccessProject(project, req.session.email, req);
+    if (!canSeeDeleted) {
+      res.status(404).json({ error: "Project niet gevonden" });
+      return null;
+    }
+  }
+  return project;
+}
+
+/** Bewerken: alleen eigenaar / admin / project zonder eigenaar. */
+async function loadAccessibleProject(
+  req,
+  res,
+  { allowDeleted = false, requireActive = false } = {}
+) {
+  const project = await Project.findById(req.params.id);
+  if (!project || !canAccessProject(project, req.session?.email, req)) {
+    res.status(404).json({ error: "Project niet gevonden" });
+    return null;
+  }
+  if (project.deletedAt) {
+    if (requireActive) {
+      assertActiveProject(project, res);
+      return null;
+    }
+    if (!allowDeleted) {
+      res.status(404).json({ error: "Project niet gevonden" });
+      return null;
+    }
   }
   return project;
 }
@@ -114,20 +237,56 @@ function applyFields(target, data, body) {
   if (body.costPrice !== undefined) target.costPrice = data.costPrice;
 }
 
-router.get("/meta", (_req, res) => {
-  res.json({
-    types: PROJECT_TYPES,
-    glasfusionTechniques: GLASFUSION_TECHNIQUES,
-    glasfusionSpeeds: GLASFUSION_SPEEDS,
-  });
+router.get("/meta", async (_req, res) => {
+  try {
+    const catalog = await listCatalogLabels();
+    res.json({
+      types: PROJECT_TYPES,
+      glasfusionTechniques: GLASFUSION_TECHNIQUES,
+      glasfusionSpeeds: GLASFUSION_SPEEDS,
+      labels: catalog.map((item) => ({
+        name: item.name,
+        color: item.color,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.get("/", async (req, res) => {
   try {
-    const projects = await Project.find(projectQueryForUser(req.session.email)).sort({
-      createdAt: -1,
+    const showDeleted =
+      req.query.deleted === "1" || req.query.deleted === "true";
+    const mineOnly =
+      req.query.mine === "1" || req.query.mine === "true";
+
+    if (showDeleted && !req.session?.email) {
+      return res.status(401).json({ error: "Session expired" });
+    }
+
+    if (mineOnly && !req.session?.email) {
+      return res.status(401).json({ error: "Session expired" });
+    }
+
+    const parts = [];
+    if (showDeleted) {
+      parts.push({ deletedAt: { $ne: null } });
+      if (!isAdminUser(req)) {
+        parts.push({ ownerEmail: req.session.email });
+      }
+    } else {
+      parts.push(notDeletedFilter());
+      if (mineOnly) {
+        parts.push(projectQueryForUser(req.session.email));
+      }
+    }
+
+    const query = parts.length === 1 ? parts[0] : { $and: parts };
+    const projects = await Project.find(query).sort({
+      ...(showDeleted ? { deletedAt: -1 } : { createdAt: -1 }),
     });
-    res.json(projects.map(serializeProject));
+    res.json(projects.map((project) => serializeForClient(project, req)));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -135,9 +294,11 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadReadableProject(req, res, {
+      allowDeleted: Boolean(req.session?.email),
+    });
     if (!project) return;
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -145,7 +306,9 @@ router.get("/:id", async (req, res) => {
 
 router.get("/:id/photos/:photoId/file", async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadReadableProject(req, res, {
+      allowDeleted: Boolean(req.session?.email),
+    });
     if (!project) return;
 
     const photo = project.photos.id(req.params.photoId);
@@ -157,7 +320,7 @@ router.get("/:id/photos/:photoId/file", async (req, res) => {
   }
 });
 
-router.post("/", upload.array("photos", 20), async (req, res) => {
+router.post("/", isAuthenticated, upload.array("photos", 20), async (req, res) => {
   try {
     const data = parseBody(req.body);
     if (!data.title) {
@@ -168,22 +331,33 @@ router.post("/", upload.array("photos", 20), async (req, res) => {
     }
 
     const photos = await storePhotos(req.files);
+    const labels = data.labels || [];
     const project = new Project({
-      ...data,
+      title: data.title,
+      type: data.type,
+      glasfusionTechnique: data.glasfusionTechnique,
+      glasfusionSpeed: data.glasfusionSpeed,
+      notes: data.notes,
+      kwhUsage: data.kwhUsage,
+      costPrice: data.costPrice,
+      labels,
       photos,
       steps: [],
       ownerEmail: req.session.email,
     });
     await project.save();
-    res.status(201).json(serializeProject(project));
+    if (labels.length) {
+      await upsertCatalogLabels(labels, req.session.email);
+    }
+    res.status(201).json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.put("/:id", upload.array("photos", 20), async (req, res) => {
+router.put("/:id", isAuthenticated, upload.array("photos", 20), async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
     claimOwner(project, req.session.email);
 
@@ -195,21 +369,25 @@ router.put("/:id", upload.array("photos", 20), async (req, res) => {
     if (typeof req.body.notes === "string") project.notes = data.notes;
     if (req.body.kwhUsage !== undefined) project.kwhUsage = data.kwhUsage;
     if (req.body.costPrice !== undefined) project.costPrice = data.costPrice;
+    if (data.labels !== null) {
+      project.labels = data.labels;
+      await upsertCatalogLabels(data.labels, req.session.email);
+    }
 
     if (req.files?.length) {
       project.photos.push(...(await storePhotos(req.files)));
     }
 
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.post("/:id/photos", upload.array("photos", 20), async (req, res) => {
+router.post("/:id/photos", isAuthenticated, upload.array("photos", 20), async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
     if (!req.files?.length) {
       return res.status(400).json({ error: "Geen foto's ontvangen" });
@@ -217,7 +395,7 @@ router.post("/:id/photos", upload.array("photos", 20), async (req, res) => {
     claimOwner(project, req.session.email);
     project.photos.push(...(await storePhotos(req.files)));
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -225,23 +403,31 @@ router.post("/:id/photos", upload.array("photos", 20), async (req, res) => {
 
 router.post("/:id/photos/:photoId/thumb", async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadReadableProject(req, res, { requireActive: true });
     if (!project) return;
 
     const photo = project.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
 
-    photo.thumbsUp = (photo.thumbsUp || 0) + 1;
+    const voterId = ensureVoterId(req);
+    const result = applyThumb(photo, voterId);
+    if (result.already) {
+      return res.status(409).json({
+        error: "Je hebt deze foto al een duimpje gegeven",
+        project: serializeForClient(project, req),
+      });
+    }
+
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.delete("/:id/photos/:photoId", async (req, res) => {
+router.delete("/:id/photos/:photoId", isAuthenticated, async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
 
     const photo = project.photos.id(req.params.photoId);
@@ -253,15 +439,15 @@ router.delete("/:id/photos/:photoId", async (req, res) => {
 
     photo.deleteOne();
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.post("/:id/steps", upload.array("photos", 20), async (req, res) => {
+router.post("/:id/steps", isAuthenticated, upload.array("photos", 20), async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
     claimOwner(project, req.session.email);
 
@@ -276,20 +462,21 @@ router.post("/:id/steps", upload.array("photos", 20), async (req, res) => {
       photos,
     });
     await project.save();
-    res.status(201).json(serializeProject(project));
+    res.status(201).json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.put("/:id/steps/:stepId", upload.array("photos", 20), async (req, res) => {
+router.put("/:id/steps/:stepId", isAuthenticated, upload.array("photos", 20), async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
     claimOwner(project, req.session.email);
 
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (!assertActiveStep(step, res)) return;
 
     const data = parseBody(req.body);
     applyFields(step, data, req.body);
@@ -302,24 +489,66 @@ router.put("/:id/steps/:stepId", upload.array("photos", 20), async (req, res) =>
     }
 
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.delete("/:id/steps/:stepId", async (req, res) => {
+router.delete("/:id/steps/:stepId", isAuthenticated, async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
+    if (!project) return;
+
+    const step = project.steps.id(req.params.stepId);
+    if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (isStepDeleted(step)) {
+      return res.json(serializeForClient(project, req));
+    }
+
+    step.deletedAt = new Date();
+    step.deletedBy = req.session.email;
+    await project.save();
+    res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post("/:id/steps/:stepId/restore", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
 
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
 
+    step.deletedAt = null;
+    step.deletedBy = null;
+    await project.save();
+    res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.delete("/:id/steps/:stepId/permanent", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
+    if (!project) return;
+
+    const step = project.steps.id(req.params.stepId);
+    if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (!isStepDeleted(step)) {
+      return res.status(400).json({
+        error: "Zet de stap eerst in de prullenbak voordat je definitief verwijdert",
+      });
+    }
+
     await deletePhotos(step.photos);
     step.deleteOne();
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -327,7 +556,9 @@ router.delete("/:id/steps/:stepId", async (req, res) => {
 
 router.get("/:id/steps/:stepId/photos/:photoId/file", async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadReadableProject(req, res, {
+      allowDeleted: Boolean(req.session?.email),
+    });
     if (!project) return;
 
     const step = project.steps.id(req.params.stepId);
@@ -342,9 +573,9 @@ router.get("/:id/steps/:stepId/photos/:photoId/file", async (req, res) => {
   }
 });
 
-router.post("/:id/steps/:stepId/photos", upload.array("photos", 20), async (req, res) => {
+router.post("/:id/steps/:stepId/photos", isAuthenticated, upload.array("photos", 20), async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
     if (!req.files?.length) {
       return res.status(400).json({ error: "Geen foto's ontvangen" });
@@ -352,11 +583,12 @@ router.post("/:id/steps/:stepId/photos", upload.array("photos", 20), async (req,
 
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (!assertActiveStep(step, res)) return;
 
     claimOwner(project, req.session.email);
     step.photos.push(...(await storePhotos(req.files)));
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -364,30 +596,40 @@ router.post("/:id/steps/:stepId/photos", upload.array("photos", 20), async (req,
 
 router.post("/:id/steps/:stepId/photos/:photoId/thumb", async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadReadableProject(req, res, { requireActive: true });
     if (!project) return;
 
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (!assertActiveStep(step, res)) return;
 
     const photo = step.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
 
-    photo.thumbsUp = (photo.thumbsUp || 0) + 1;
+    const voterId = ensureVoterId(req);
+    const result = applyThumb(photo, voterId);
+    if (result.already) {
+      return res.status(409).json({
+        error: "Je hebt deze foto al een duimpje gegeven",
+        project: serializeForClient(project, req),
+      });
+    }
+
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.delete("/:id/steps/:stepId/photos/:photoId", async (req, res) => {
+router.delete("/:id/steps/:stepId/photos/:photoId", isAuthenticated, async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
     if (!project) return;
 
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (!assertActiveStep(step, res)) return;
 
     const photo = step.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
@@ -398,22 +640,43 @@ router.delete("/:id/steps/:stepId/photos/:photoId", async (req, res) => {
 
     photo.deleteOne();
     await project.save();
-    res.json(serializeProject(project));
+    res.json(serializeForClient(project, req));
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.post("/:id/restore", isAuthenticated, async (req, res) => {
   try {
-    const project = await loadAccessibleProject(req, res);
+    const project = await loadAccessibleProject(req, res, { allowDeleted: true });
     if (!project) return;
+    if (!project.deletedAt) {
+      return res.json(serializeForClient(project, req));
+    }
+
+    project.deletedAt = null;
+    project.deletedBy = null;
+    await project.save();
+    res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.delete("/:id/permanent", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { allowDeleted: true });
+    if (!project) return;
+    if (!project.deletedAt) {
+      return res.status(400).json({
+        error: "Zet het project eerst in de prullenbak voordat je definitief verwijdert",
+      });
+    }
 
     await deletePhotos(project.photos);
     for (const step of project.steps || []) {
       await deletePhotos(step.photos);
     }
-
     await project.deleteOne();
     res.json({ ok: true });
   } catch (error) {
@@ -421,4 +684,23 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.delete("/:id", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { allowDeleted: true });
+    if (!project) return;
+
+    if (project.deletedAt) {
+      return res.json({ ok: true, alreadyDeleted: true });
+    }
+
+    project.deletedAt = new Date();
+    project.deletedBy = req.session.email;
+    await project.save();
+    res.json({ ok: true, project: serializeForClient(project, req) });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 module.exports = router;
+

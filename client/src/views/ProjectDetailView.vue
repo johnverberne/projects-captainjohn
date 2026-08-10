@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ProjectOptionFields from "../components/ProjectOptionFields.vue";
+import PhotoUploadPicker from "../components/PhotoUploadPicker.vue";
 import {
   addPhotos,
   addStep,
@@ -10,11 +11,16 @@ import {
   deleteStep,
   getMeta,
   getProject,
+  purgeProject,
+  purgeStep,
+  restoreProject,
+  restoreStep,
   thumbPhoto,
   thumbStepPhoto,
   updateProject,
   updateStep,
 } from "../api";
+import { useAuth } from "../auth";
 import {
   typeLabel,
   TYPE_LABELS,
@@ -25,10 +31,15 @@ import {
   formatDate,
   formatKwh,
   formatEuro,
+  labelChipStyle,
 } from "../labels";
 
 const route = useRoute();
 const router = useRouter();
+const { isAdmin, isLoggedIn, user } = useAuth();
+
+const editMode = computed(() => Boolean(route.meta.editMode));
+const homePath = computed(() => (editMode.value ? "/bewerken" : "/"));
 
 const project = ref(null);
 const loading = ref(true);
@@ -46,6 +57,7 @@ const meta = ref({
   types: Object.keys(TYPE_LABELS),
   glasfusionTechniques: Object.keys(TECHNIQUE_LABELS),
   glasfusionSpeeds: Object.keys(SPEED_LABELS),
+  labels: [],
 });
 
 const title = ref("");
@@ -55,11 +67,29 @@ const glasfusionSpeed = ref("");
 const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
+const projectLabels = ref([]);
 const stepFiles = ref([]);
 const stepPreviews = ref([]);
 
 const isGlasfusion = computed(() => type.value === "glasfusion");
-const steps = computed(() => project.value?.steps || []);
+const allSteps = computed(() => project.value?.steps || []);
+const steps = computed(() => allSteps.value.filter((step) => !step.deletedAt));
+const deletedSteps = computed(() =>
+  allSteps.value.filter((step) => Boolean(step.deletedAt))
+);
+const isDeleted = computed(() => Boolean(project.value?.deletedAt));
+const restoring = ref(false);
+const stepBusyId = ref("");
+
+const canManage = computed(() => {
+  if (!editMode.value || !isLoggedIn.value || !project.value) return false;
+  if (isAdmin.value) return true;
+  const owner = project.value.ownerEmail;
+  if (!owner) return true;
+  return owner === user.value?.email;
+});
+
+const canEdit = computed(() => canManage.value && !isDeleted.value);
 
 const totals = computed(() => {
   if (!project.value) return { kwh: null, cost: null };
@@ -80,7 +110,7 @@ const totals = computed(() => {
   };
 
   add(project.value);
-  for (const step of project.value.steps || []) add(step);
+  for (const step of steps.value) add(step);
 
   return {
     kwh: hasKwh ? kwh : null,
@@ -112,9 +142,11 @@ function syncViewerPhoto() {
   viewerPhoto.value = findPhoto(viewerPhoto.value._id, viewerStepId.value);
 }
 
+const canThumb = computed(() => Boolean(project.value) && !isDeleted.value);
+
 async function giveThumb(photo, event, stepId = null) {
   event?.stopPropagation();
-  if (!photo?._id || liking.value) return;
+  if (!canThumb.value || !photo?._id || liking.value || photo.thumbedByMe) return;
   liking.value = true;
   error.value = "";
   try {
@@ -148,6 +180,7 @@ function resetForm() {
   notes.value = "";
   kwhUsage.value = "";
   costPrice.value = "";
+  projectLabels.value = [];
   clearStepFiles();
 }
 
@@ -159,10 +192,14 @@ function fillForm(item) {
   notes.value = item.notes || "";
   kwhUsage.value = item.kwhUsage ?? "";
   costPrice.value = item.costPrice ?? "";
+  projectLabels.value = (item.labels || []).map((label) => ({
+    name: label.name,
+    color: label.color,
+  }));
 }
 
 function startEditProject() {
-  if (!project.value) return;
+  if (!canEdit.value || !project.value) return;
   fillForm(project.value);
   clearStepFiles();
   error.value = "";
@@ -170,6 +207,7 @@ function startEditProject() {
 }
 
 function startAddStep() {
+  if (!canEdit.value) return;
   resetForm();
   error.value = "";
   editingStepId.value = null;
@@ -177,6 +215,7 @@ function startAddStep() {
 }
 
 function startEditStep(step) {
+  if (!canEdit.value) return;
   fillForm(step);
   clearStepFiles();
   error.value = "";
@@ -219,7 +258,7 @@ function validateForm({ requireTitle }) {
   return true;
 }
 
-function buildFormData({ includePhotos = false } = {}) {
+function buildFormData({ includePhotos = false, includeLabels = false } = {}) {
   const form = new FormData();
   form.append("title", title.value.trim());
   form.append("type", type.value);
@@ -229,6 +268,9 @@ function buildFormData({ includePhotos = false } = {}) {
   if (isGlasfusion.value) {
     form.append("glasfusionTechnique", glasfusionTechnique.value);
     form.append("glasfusionSpeed", glasfusionSpeed.value);
+  }
+  if (includeLabels) {
+    form.append("labels", JSON.stringify(projectLabels.value || []));
   }
   if (includePhotos) {
     for (const file of stepFiles.value) form.append("photos", file);
@@ -240,13 +282,34 @@ async function saveProjectEdit() {
   if (!validateForm({ requireTitle: true })) return;
   saving.value = true;
   try {
-    project.value = await updateProject(route.params.id, buildFormData());
+    project.value = await updateProject(
+      route.params.id,
+      buildFormData({ includeLabels: true })
+    );
+    meta.value = {
+      ...meta.value,
+      labels: mergeCatalog(meta.value.labels, projectLabels.value),
+    };
     mode.value = "view";
   } catch (e) {
     error.value = e.message;
   } finally {
     saving.value = false;
   }
+}
+
+function mergeCatalog(catalog, added) {
+  const map = new Map();
+  for (const item of [...(catalog || []), ...(added || [])]) {
+    const key = String(item.name || "")
+      .trim()
+      .toLowerCase();
+    if (!key) continue;
+    map.set(key, { name: item.name, color: item.color });
+  }
+  return [...map.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, "nl", { sensitivity: "base" })
+  );
 }
 
 async function saveStep() {
@@ -331,7 +394,13 @@ async function onMorePhotos(event, stepId = null) {
 
 async function removeStep(step) {
   const label = stepHeading(step, steps.value.indexOf(step));
-  if (!confirm(`Stap “${label}” verwijderen?`)) return;
+  if (
+    !confirm(
+      `Stap “${label}” verwijderen? Je kunt hem later terugzetten of definitief wissen.`
+    )
+  ) {
+    return;
+  }
   error.value = "";
   try {
     project.value = await deleteStep(route.params.id, step._id);
@@ -340,13 +409,86 @@ async function removeStep(step) {
   }
 }
 
-async function remove() {
-  if (!confirm("Dit project verwijderen?")) return;
+async function restoreDeletedStep(step) {
+  const label = stepHeading(step, 0);
+  if (!confirm(`Stap “${label}” terugzetten?`)) return;
+  stepBusyId.value = `restore-${step._id}`;
+  error.value = "";
   try {
-    await deleteProject(route.params.id);
-    router.replace("/");
+    project.value = await restoreStep(route.params.id, step._id);
   } catch (e) {
     error.value = e.message;
+  } finally {
+    stepBusyId.value = "";
+  }
+}
+
+async function purgeDeletedStep(step) {
+  const label = stepHeading(step, 0);
+  if (
+    !confirm(
+      `Stap “${label}” DEFINITIEF verwijderen? Dit kan niet ongedaan worden gemaakt.`
+    )
+  ) {
+    return;
+  }
+  stepBusyId.value = `purge-${step._id}`;
+  error.value = "";
+  try {
+    project.value = await purgeStep(route.params.id, step._id);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    stepBusyId.value = "";
+  }
+}
+
+async function remove() {
+  if (
+    !confirm(
+      "Dit project verwijderen? Het verdwijnt uit de lijst; je kunt het later terugzetten of definitief wissen."
+    )
+  ) {
+    return;
+  }
+  try {
+    await deleteProject(route.params.id);
+    router.replace(homePath.value);
+  } catch (e) {
+    error.value = e.message;
+  }
+}
+
+async function restore() {
+  if (!confirm("Dit project terugzetten?")) return;
+  restoring.value = true;
+  error.value = "";
+  try {
+    project.value = await restoreProject(route.params.id);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    restoring.value = false;
+  }
+}
+
+async function purge() {
+  if (
+    !confirm(
+      "Dit project DEFINITIEF verwijderen? Foto’s en stappen gaan ook weg. Dit kan niet ongedaan worden gemaakt."
+    )
+  ) {
+    return;
+  }
+  restoring.value = true;
+  error.value = "";
+  try {
+    await purgeProject(route.params.id);
+    router.replace(homePath.value);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    restoring.value = false;
   }
 }
 </script>
@@ -356,7 +498,7 @@ async function remove() {
     <p v-if="loading" class="muted">Laden…</p>
     <p v-else-if="error && !project" class="error">{{ error }}</p>
 
-    <template v-else-if="project && mode === 'edit-project'">
+    <template v-else-if="project && canEdit && mode === 'edit-project'">
       <div>
         <h1>Project bewerken</h1>
         <p class="lead">Pas titel, soort en overige gegevens aan.</p>
@@ -370,7 +512,9 @@ async function remove() {
         v-model:notes="notes"
         v-model:kwh-usage="kwhUsage"
         v-model:cost-price="costPrice"
+        v-model:labels="projectLabels"
         :meta="meta"
+        :show-labels="true"
         id-prefix="edit-project"
       />
 
@@ -386,7 +530,7 @@ async function remove() {
       </div>
     </template>
 
-    <template v-else-if="project && (mode === 'add-step' || mode === 'edit-step')">
+    <template v-else-if="project && canEdit && (mode === 'add-step' || mode === 'edit-step')">
       <div>
         <h1>{{ mode === 'add-step' ? 'Stap toevoegen' : 'Stap bewerken' }}</h1>
         <p class="lead">
@@ -411,17 +555,7 @@ async function remove() {
 
       <div v-if="mode === 'add-step'" class="field">
         <label>Foto’s</label>
-        <div class="file-drop">
-          <strong>Tik om foto’s te kiezen</strong>
-          <span class="muted">Meerdere foto’s mogelijk · camera of galerij</span>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            @change="onStepFiles"
-          />
-        </div>
+        <PhotoUploadPicker title="Foto’s bij deze stap" @change="onStepFiles" />
         <div v-if="stepPreviews.length" class="photo-grid" style="margin-top: 12px">
           <div
             v-for="(preview, index) in stepPreviews"
@@ -454,10 +588,38 @@ async function remove() {
     </template>
 
     <template v-else-if="project">
+      <p v-if="isDeleted" class="deleted-banner">
+        Dit project is verwijderd
+        <template v-if="project.deletedAt">
+          op {{ formatDate(project.deletedAt) }}
+        </template>
+        <template v-if="project.deletedBy">
+          door {{ project.deletedBy }}
+        </template>
+        . Foto’s en gegevens blijven bewaard.
+      </p>
+      <p v-else-if="!editMode" class="muted" style="margin: 0">
+        Publieke weergave — alleen bekijken.
+      </p>
+      <p v-else-if="!canEdit" class="muted" style="margin: 0">
+        Je hebt geen rechten om dit project te bewerken.
+      </p>
+
       <div>
         <span class="badge">{{ typeLabel(project.type) }}</span>
+        <span v-if="isDeleted" class="badge badge-deleted">Verwijderd</span>
         <h1 style="margin-top: 10px">{{ project.title }}</h1>
         <p class="lead">{{ craftSubtitle(project) }}</p>
+        <div v-if="project.labels?.length" class="label-chip-row">
+          <span
+            v-for="label in project.labels"
+            :key="label.name"
+            class="label-chip"
+            :style="labelChipStyle(label.color)"
+          >
+            {{ label.name }}
+          </span>
+        </div>
         <p class="muted">Gestart {{ formatDate(project.createdAt) }}</p>
       </div>
 
@@ -495,38 +657,47 @@ async function remove() {
             >
               <img :src="photo.url" :alt="photo.originalName" />
             </button>
-            <button
-              type="button"
-              class="thumb-chip"
-              :disabled="liking"
-              :aria-label="`Duimpje geven, nu ${photo.thumbsUp || 0}`"
-              @click="giveThumb(photo, $event)"
-            >
-              <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-                />
-              </svg>
-              <span>{{ photo.thumbsUp || 0 }}</span>
-            </button>
+                <button
+                  v-if="canThumb"
+                  type="button"
+                  class="thumb-chip"
+                  :class="{ done: photo.thumbedByMe }"
+                  :disabled="liking || photo.thumbedByMe"
+                  :aria-label="
+                    photo.thumbedByMe
+                      ? `Al een duimpje gegeven, nu ${photo.thumbsUp || 0}`
+                      : `Duimpje geven, nu ${photo.thumbsUp || 0}`
+                  "
+                  @click="giveThumb(photo, $event)"
+                >
+                  <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                    />
+                  </svg>
+                  <span>{{ photo.thumbsUp || 0 }}</span>
+                </button>
+                <span v-else class="thumb-chip thumb-chip-static">
+                  <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                    />
+                  </svg>
+                  <span>{{ photo.thumbsUp || 0 }}</span>
+                </span>
           </div>
         </div>
         <p v-else class="muted" style="margin-top: 8px">Nog geen foto’s.</p>
       </div>
 
-      <div class="file-drop">
-        <strong>{{ uploading && !stepUploadId ? "Uploaden…" : "Meer foto’s toevoegen" }}</strong>
-        <span class="muted">Meerdere tegelijk mogelijk</span>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          capture="environment"
-          :disabled="uploading"
-          @change="onMorePhotos($event)"
-        />
-      </div>
+      <PhotoUploadPicker
+        v-if="canEdit"
+        title="Meer foto’s toevoegen"
+        :disabled="uploading"
+        @change="onMorePhotos($event)"
+      />
 
       <div class="step-section">
         <div class="step-section-head">
@@ -585,10 +756,16 @@ async function remove() {
                   <img :src="photo.url" :alt="photo.originalName" />
                 </button>
                 <button
+                  v-if="canThumb"
                   type="button"
                   class="thumb-chip"
-                  :disabled="liking"
-                  :aria-label="`Duimpje geven, nu ${photo.thumbsUp || 0}`"
+                  :class="{ done: photo.thumbedByMe }"
+                  :disabled="liking || photo.thumbedByMe"
+                  :aria-label="
+                    photo.thumbedByMe
+                      ? `Al een duimpje gegeven, nu ${photo.thumbsUp || 0}`
+                      : `Duimpje geven, nu ${photo.thumbsUp || 0}`
+                  "
                   @click="giveThumb(photo, $event, step._id)"
                 >
                   <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -599,31 +776,28 @@ async function remove() {
                   </svg>
                   <span>{{ photo.thumbsUp || 0 }}</span>
                 </button>
+                <span v-else class="thumb-chip thumb-chip-static">
+                  <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                    />
+                  </svg>
+                  <span>{{ photo.thumbsUp || 0 }}</span>
+                </span>
               </div>
             </div>
             <p v-else class="muted" style="margin-top: 8px">Nog geen foto’s bij deze stap.</p>
           </div>
 
-          <div class="file-drop">
-            <strong>
-              {{
-                uploading && stepUploadId === step._id
-                  ? "Uploaden…"
-                  : "Foto’s bij deze stap"
-              }}
-            </strong>
-            <span class="muted">Meerdere tegelijk mogelijk</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              capture="environment"
-              :disabled="uploading"
-              @change="onMorePhotos($event, step._id)"
-            />
-          </div>
+          <PhotoUploadPicker
+            v-if="canEdit"
+            title="Foto’s bij deze stap"
+            :disabled="uploading"
+            @change="onMorePhotos($event, step._id)"
+          />
 
-          <div class="step-actions">
+          <div v-if="canEdit" class="step-actions">
             <button class="btn btn-secondary btn-small" type="button" @click="startEditStep(step)">
               Stap bewerken
             </button>
@@ -633,9 +807,62 @@ async function remove() {
           </div>
         </article>
 
-        <button class="btn btn-secondary btn-block" type="button" @click="startAddStep">
+        <button
+          v-if="canEdit"
+          class="btn btn-secondary btn-block"
+          type="button"
+          @click="startAddStep"
+        >
           Stap toevoegen
         </button>
+
+        <div
+          v-if="canManage && deletedSteps.length"
+          class="trash-section"
+          style="margin-top: 8px"
+        >
+          <h3 class="trash-heading">Verwijderde stappen</h3>
+          <p class="muted">Terugzetten of definitief wissen.</p>
+          <article
+            v-for="step in deletedSteps"
+            :key="step._id"
+            class="step-block step-block-deleted"
+          >
+            <div class="step-block-head">
+              <span class="badge badge-deleted">Verwijderd</span>
+              <span class="badge">{{ typeLabel(step.type) }}</span>
+              <h3>{{ stepHeading(step, 0) }}</h3>
+              <p class="muted">
+                Verwijderd {{ formatDate(step.deletedAt) }}
+                <template v-if="step.deletedBy"> · door {{ step.deletedBy }}</template>
+              </p>
+            </div>
+            <div class="trash-actions">
+              <button
+                class="btn btn-secondary btn-small"
+                type="button"
+                :disabled="stepBusyId === `restore-${step._id}`"
+                @click="restoreDeletedStep(step)"
+              >
+                {{
+                  stepBusyId === `restore-${step._id}` ? "Bezig…" : "Terugzetten"
+                }}
+              </button>
+              <button
+                class="btn btn-danger btn-small"
+                type="button"
+                :disabled="stepBusyId === `purge-${step._id}`"
+                @click="purgeDeletedStep(step)"
+              >
+                {{
+                  stepBusyId === `purge-${step._id}`
+                    ? "Bezig…"
+                    : "Definitief wissen"
+                }}
+              </button>
+            </div>
+          </article>
+        </div>
       </div>
 
       <div
@@ -669,10 +896,16 @@ async function remove() {
           :alt="viewerPhoto.originalName"
         />
         <button
+          v-if="canThumb"
           type="button"
           class="lightbox-thumb"
-          :disabled="liking"
-          :aria-label="`Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`"
+          :class="{ done: viewerPhoto.thumbedByMe }"
+          :disabled="liking || viewerPhoto.thumbedByMe"
+          :aria-label="
+            viewerPhoto.thumbedByMe
+              ? `Al een duimpje gegeven, nu ${viewerPhoto.thumbsUp || 0}`
+              : `Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`
+          "
           @click="giveThumb(viewerPhoto, $event, viewerStepId)"
         >
           <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -683,16 +916,53 @@ async function remove() {
           </svg>
           <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
         </button>
+        <span v-else class="lightbox-thumb thumb-chip-static">
+          <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+            />
+          </svg>
+          <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
+        </span>
       </div>
 
       <p v-if="error" class="error">{{ error }}</p>
 
       <div class="actions">
-        <button class="btn btn-primary" type="button" @click="startEditProject">
+        <button
+          v-if="canManage && isDeleted"
+          class="btn btn-primary"
+          type="button"
+          :disabled="restoring"
+          @click="restore"
+        >
+          {{ restoring ? "Bezig…" : "Terugzetten" }}
+        </button>
+        <button
+          v-if="canManage && isDeleted"
+          class="btn btn-danger"
+          type="button"
+          :disabled="restoring"
+          @click="purge"
+        >
+          Definitief wissen
+        </button>
+        <button
+          v-if="canEdit"
+          class="btn btn-primary"
+          type="button"
+          @click="startEditProject"
+        >
           Bewerken
         </button>
-        <router-link class="btn btn-secondary" to="/">Terug</router-link>
-        <button class="btn btn-danger" type="button" @click="remove">
+        <router-link class="btn btn-secondary" :to="homePath">Terug</router-link>
+        <button
+          v-if="canEdit"
+          class="btn btn-danger"
+          type="button"
+          @click="remove"
+        >
           Verwijderen
         </button>
       </div>

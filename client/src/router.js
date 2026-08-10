@@ -9,28 +9,51 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
-      path: "/auth",
-      name: "auth",
-      component: AuthView,
-      meta: { guest: true },
-    },
-    {
       path: "/",
       name: "home",
       component: HomeView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: "/nieuw",
-      name: "new",
-      component: NewProjectView,
-      meta: { requiresAuth: true },
+      meta: { public: true },
     },
     {
       path: "/project/:id",
       name: "detail",
       component: ProjectDetailView,
-      meta: { requiresAuth: true },
+      meta: { public: true },
+    },
+    {
+      path: "/inloggen",
+      name: "login",
+      component: AuthView,
+      meta: { guest: true },
+    },
+    {
+      path: "/auth",
+      redirect: (to) => ({
+        path: "/inloggen",
+        query: to.query,
+      }),
+    },
+    {
+      path: "/bewerken",
+      name: "edit-home",
+      component: HomeView,
+      meta: { requiresAuth: true, editMode: true },
+    },
+    {
+      path: "/bewerken/nieuw",
+      name: "edit-new",
+      component: NewProjectView,
+      meta: { requiresAuth: true, editMode: true },
+    },
+    {
+      path: "/bewerken/project/:id",
+      name: "edit-detail",
+      component: ProjectDetailView,
+      meta: { requiresAuth: true, editMode: true },
+    },
+    {
+      path: "/nieuw",
+      redirect: "/bewerken/nieuw",
     },
   ],
   scrollBehavior() {
@@ -46,11 +69,25 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !auth.isLoggedIn.value) {
     auth.returnUrl.value = to.fullPath;
-    return { path: "/auth", replace: true };
+    return { path: "/inloggen", query: { return: to.fullPath }, replace: true };
   }
 
   if (to.meta.guest && auth.isLoggedIn.value) {
-    return { path: "/", replace: true };
+    const ret = String(to.query.return || auth.returnUrl.value || "/bewerken").trim();
+    const target = ret.startsWith("/") && !ret.startsWith("//") ? ret : "/bewerken";
+    if (target.startsWith("/api")) {
+      window.location.replace(target);
+      return false;
+    }
+    return { path: target, replace: true };
+  }
+
+  // Ingelogd: altijd de bewerk-kant, nooit de publieke routes
+  if (auth.isLoggedIn.value && to.meta.public) {
+    if (to.name === "detail") {
+      return { path: `/bewerken/project/${to.params.id}`, replace: true };
+    }
+    return { path: "/bewerken", replace: true };
   }
 
   return true;

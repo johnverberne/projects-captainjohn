@@ -1,30 +1,88 @@
 <script setup>
-import { onMounted, ref } from "vue";
-import { listProjects } from "../api";
-import { typeLabel, formatDate, formatKwh, formatEuro } from "../labels";
+import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
+import { listProjects, purgeProject, restoreProject } from "../api";
+import { typeLabel, formatDate, formatKwh, formatEuro, labelChipStyle } from "../labels";
 
+const route = useRoute();
+
+const editMode = computed(() => Boolean(route.meta.editMode));
 const projects = ref([]);
+const deletedProjects = ref([]);
 const loading = ref(true);
 const error = ref("");
+const busyId = ref("");
 
 function photoCount(project) {
   const main = project.photos?.length || 0;
-  const steps = (project.steps || []).reduce(
-    (sum, step) => sum + (step.photos?.length || 0),
-    0
-  );
+  const steps = (project.steps || [])
+    .filter((step) => !step.deletedAt)
+    .reduce((sum, step) => sum + (step.photos?.length || 0), 0);
   return main + steps;
 }
 
-onMounted(async () => {
+function projectLink(project) {
+  return editMode.value
+    ? `/bewerken/project/${project._id}`
+    : `/project/${project._id}`;
+}
+
+async function load() {
+  loading.value = true;
+  error.value = "";
   try {
     projects.value = await listProjects();
+    if (editMode.value) {
+      deletedProjects.value = await listProjects({ deleted: true });
+    } else {
+      deletedProjects.value = [];
+    }
   } catch (e) {
     error.value = e.message;
   } finally {
     loading.value = false;
   }
-});
+}
+
+async function restore(project) {
+  if (!confirm(`Project “${project.title}” terugzetten?`)) return;
+  busyId.value = `restore-${project._id}`;
+  error.value = "";
+  try {
+    await restoreProject(project._id);
+    await load();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busyId.value = "";
+  }
+}
+
+async function purge(project) {
+  if (
+    !confirm(
+      `Project “${project.title}” DEFINITIEF verwijderen? Dit kan niet ongedaan worden gemaakt.`
+    )
+  ) {
+    return;
+  }
+  busyId.value = `purge-${project._id}`;
+  error.value = "";
+  try {
+    await purgeProject(project._id);
+    await load();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    busyId.value = "";
+  }
+}
+
+const showTrash = computed(
+  () => editMode.value && deletedProjects.value.length > 0
+);
+
+onMounted(load);
 </script>
 
 <template>
@@ -37,59 +95,149 @@ onMounted(async () => {
         width="220"
         height="220"
       />
-      <p class="lead">Start een nieuw atelierproject vanaf je telefoon.</p>
+      <p class="lead">
+        {{
+          editMode
+            ? "Bewerk je atelierprojecten vanaf je telefoon."
+            : "Bekijk de atelierprojecten van Captain John."
+        }}
+      </p>
+      <p v-if="!editMode" class="muted" style="margin: 0">
+        Alleen kijken — om te wijzigen log je in.
+      </p>
     </div>
 
-    <router-link class="btn btn-primary btn-block" to="/nieuw">
+    <router-link
+      v-if="editMode"
+      class="btn btn-primary btn-block"
+      to="/bewerken/nieuw"
+    >
       Nieuw project starten
     </router-link>
 
     <p v-if="loading" class="muted">Laden…</p>
     <p v-else-if="error" class="error">{{ error }}</p>
 
-    <div v-else-if="!projects.length" class="empty">
-      Nog geen projecten. Tik op “Nieuw project starten”.
-    </div>
+    <template v-else>
+      <div v-if="!projects.length" class="empty">
+        {{
+          editMode
+            ? "Nog geen projecten. Tik op “Nieuw project starten”."
+            : "Nog geen projecten om te bekijken."
+        }}
+      </div>
 
-    <div v-else class="project-list">
-      <router-link
-        v-for="project in projects"
-        :key="project._id"
-        class="project-card"
-        :to="`/project/${project._id}`"
-      >
-        <img
-          v-if="project.photos?.[0]"
-          class="thumb"
-          :src="project.photos[0].url"
-          :alt="project.title"
-        />
-        <div v-else class="thumb placeholder">geen foto</div>
-        <div>
-          <h2 class="meta-title">{{ project.title }}</h2>
-          <span class="badge">{{ typeLabel(project.type) }}</span>
-          <span
-            v-if="project.steps?.length"
-            class="badge badge-soft"
+      <div v-else class="project-list">
+        <router-link
+          v-for="project in projects"
+          :key="project._id"
+          class="project-card"
+          :to="projectLink(project)"
+        >
+          <img
+            v-if="project.photos?.[0]"
+            class="thumb"
+            :src="project.photos[0].url"
+            :alt="project.title"
+          />
+          <div v-else class="thumb placeholder">geen foto</div>
+          <div>
+            <h2 class="meta-title">{{ project.title }}</h2>
+            <span class="badge">{{ typeLabel(project.type) }}</span>
+            <span
+              v-if="project.steps?.filter((s) => !s.deletedAt).length"
+              class="badge badge-soft"
+            >
+              +{{ project.steps.filter((s) => !s.deletedAt).length }} stap{{
+                project.steps.filter((s) => !s.deletedAt).length === 1
+                  ? ""
+                  : "pen"
+              }}
+            </span>
+            <div v-if="project.labels?.length" class="label-chip-row compact">
+              <span
+                v-for="label in project.labels"
+                :key="label.name"
+                class="label-chip"
+                :style="labelChipStyle(label.color)"
+              >
+                {{ label.name }}
+              </span>
+            </div>
+            <p class="muted" style="margin: 6px 0 0">
+              {{ formatDate(project.createdAt) }}
+              · {{ photoCount(project) }} foto{{
+                photoCount(project) === 1 ? "" : "'s"
+              }}
+              <template v-if="project.kwhUsage != null">
+                · {{ formatKwh(project.kwhUsage) }}
+              </template>
+              <template v-if="project.costPrice != null">
+                · {{ formatEuro(project.costPrice) }}
+              </template>
+            </p>
+          </div>
+        </router-link>
+      </div>
+
+      <div v-if="showTrash" class="trash-section">
+        <h2 class="trash-heading">Verwijderde projecten</h2>
+        <p class="muted">
+          Terugzetten of definitief verwijderen. Definitief wissen haalt ook foto’s weg.
+        </p>
+        <div class="project-list">
+          <div
+            v-for="project in deletedProjects"
+            :key="project._id"
+            class="project-card project-card-deleted"
           >
-            +{{ project.steps.length }} stap{{
-              project.steps.length === 1 ? "" : "pen"
-            }}
-          </span>
-          <p class="muted" style="margin: 6px 0 0">
-            {{ formatDate(project.createdAt) }}
-            · {{ photoCount(project) }} foto{{
-              photoCount(project) === 1 ? "" : "'s"
-            }}
-            <template v-if="project.kwhUsage != null">
-              · {{ formatKwh(project.kwhUsage) }}
-            </template>
-            <template v-if="project.costPrice != null">
-              · {{ formatEuro(project.costPrice) }}
-            </template>
-          </p>
+            <router-link class="project-card-main" :to="projectLink(project)">
+              <img
+                v-if="project.photos?.[0]"
+                class="thumb"
+                :src="project.photos[0].url"
+                :alt="project.title"
+              />
+              <div v-else class="thumb placeholder">geen foto</div>
+              <div>
+                <h2 class="meta-title">{{ project.title }}</h2>
+                <span class="badge badge-deleted">Verwijderd</span>
+                <span class="badge">{{ typeLabel(project.type) }}</span>
+                <p class="muted" style="margin: 6px 0 0">
+                  Verwijderd {{ formatDate(project.deletedAt) }}
+                  <template v-if="project.deletedBy">
+                    · door {{ project.deletedBy }}
+                  </template>
+                </p>
+              </div>
+            </router-link>
+            <div class="trash-actions">
+              <button
+                class="btn btn-secondary"
+                type="button"
+                :disabled="busyId === `restore-${project._id}`"
+                @click="restore(project)"
+              >
+                {{
+                  busyId === `restore-${project._id}` ? "Bezig…" : "Terugzetten"
+                }}
+              </button>
+              <button
+                class="btn btn-danger"
+                type="button"
+                :disabled="busyId === `purge-${project._id}`"
+                @click="purge(project)"
+              >
+                {{
+                  busyId === `purge-${project._id}`
+                    ? "Bezig…"
+                    : "Definitief wissen"
+                }}
+              </button>
+            </div>
+          </div>
         </div>
-      </router-link>
-    </div>
+      </div>
+    </template>
   </section>
 </template>

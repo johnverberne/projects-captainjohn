@@ -8,10 +8,18 @@ import {
 
 const user = ref(null);
 const ready = ref(false);
-const returnUrl = ref("/");
+const returnUrl = ref("/bewerken");
+
+const ADMIN_EMAIL = "john.verberne@gmail.com";
 
 export function useAuth() {
   const isLoggedIn = computed(() => Boolean(user.value));
+  const isAdmin = computed(() => {
+    if (!user.value) return false;
+    const email = String(user.value.email || "").toLowerCase();
+    const roles = user.value.roles || [];
+    return email === ADMIN_EMAIL || roles.includes("admin");
+  });
 
   async function refresh() {
     try {
@@ -47,6 +55,7 @@ export function useAuth() {
     ready,
     returnUrl,
     isLoggedIn,
+    isAdmin,
     refresh,
     login,
     requestAccess,

@@ -37,6 +37,7 @@ function storePhotoBuffer(file) {
         mimetype: file.mimetype,
         size: file.size,
         thumbsUp: 0,
+        thumbedBy: [],
       });
     });
 
@@ -96,7 +97,8 @@ async function migrateLegacyPhoto(project, photo) {
   return photo;
 }
 
-function serializePhoto(photo, url) {
+function serializePhoto(photo, url, voterId = null) {
+  const thumbedBy = Array.isArray(photo.thumbedBy) ? photo.thumbedBy : [];
   return {
     _id: photo._id,
     filename: photo.filename,
@@ -104,12 +106,13 @@ function serializePhoto(photo, url) {
     mimetype: photo.mimetype,
     size: photo.size,
     thumbsUp: photo.thumbsUp || 0,
+    thumbedByMe: Boolean(voterId && thumbedBy.includes(voterId)),
     fileId: photo.fileId,
     url,
   };
 }
 
-function serializeProject(project) {
+function serializeProject(project, { voterId = null } = {}) {
   const obj =
     typeof project.toObject === "function"
       ? project.toObject({ virtuals: true })
@@ -120,7 +123,8 @@ function serializeProject(project) {
   obj.photos = (obj.photos || []).map((photo) =>
     serializePhoto(
       photo,
-      `/api/projects/${projectId}/photos/${String(photo._id)}/file`
+      `/api/projects/${projectId}/photos/${String(photo._id)}/file`,
+      voterId
     )
   );
 
@@ -131,7 +135,10 @@ function serializeProject(project) {
       photos: (step.photos || []).map((photo) =>
         serializePhoto(
           photo,
-          `/api/projects/${projectId}/steps/${stepId}/photos/${String(photo._id)}/file`
+          `/api/projects/${projectId}/steps/${stepId}/photos/${String(
+            photo._id
+          )}/file`,
+          voterId
         )
       ),
     };

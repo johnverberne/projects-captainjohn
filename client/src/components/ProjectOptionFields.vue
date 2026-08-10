@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { TYPE_LABELS, TECHNIQUE_LABELS, SPEED_LABELS } from "../labels";
+import LabelPicker from "./LabelPicker.vue";
 
 const title = defineModel("title", { type: String, default: "" });
 const type = defineModel("type", { type: String, default: "" });
@@ -15,11 +16,13 @@ const glasfusionSpeed = defineModel("glasfusionSpeed", {
 const notes = defineModel("notes", { type: String, default: "" });
 const kwhUsage = defineModel("kwhUsage", { default: "" });
 const costPrice = defineModel("costPrice", { default: "" });
+const labels = defineModel("labels", { type: Array, default: () => [] });
 
 defineProps({
   meta: { type: Object, required: true },
   idPrefix: { type: String, default: "field" },
   showTitle: { type: Boolean, default: true },
+  showLabels: { type: Boolean, default: false },
   titleLabel: { type: String, default: "Titel" },
   titlePlaceholder: { type: String, default: "Bijv. Blauw schaaltje" },
   typeLabelText: { type: String, default: "Soort project" },
@@ -125,6 +128,12 @@ function selectType(value) {
         />
       </div>
     </div>
+
+    <LabelPicker
+      v-if="showLabels"
+      v-model="labels"
+      :catalog="meta.labels || []"
+    />
 
     <div class="field">
       <label :for="`${idPrefix}-notes`">Notities (optioneel)</label>

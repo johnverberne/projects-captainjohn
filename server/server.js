@@ -11,6 +11,7 @@ const MongoStore = require("connect-mongo");
 
 const projectsRouter = require("./api/projects");
 const authRouter = require("./api/auth");
+const apiDocsRouter = require("./api/apiDocs");
 const Project = require("./model/project.model");
 const { migrateLegacyPhoto } = require("./services/photoStorage");
 
@@ -68,6 +69,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+app.use("/api", apiDocsRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
