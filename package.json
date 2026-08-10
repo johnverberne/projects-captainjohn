@@ -10,7 +10,8 @@
     "server": "nodemon server/server.js",
     "client": "npm --prefix ./client run dev",
     "build": "npm --prefix ./client run build",
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "prod": "npm run build && node scripts/prod.js"
   },
   "dependencies": {
     "body-parser": "^1.20.3",
