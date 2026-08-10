@@ -1,4 +1,4 @@
-const dotenv = require("dotenv").config();
+require("./loadEnv");
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -10,6 +10,7 @@ const session = require("express-session");
 const MongoStore = require("connect-mongo");
 
 const projectsRouter = require("./api/projects");
+const authRouter = require("./api/auth");
 const Project = require("./model/project.model");
 const { migrateLegacyPhoto } = require("./services/photoStorage");
 
@@ -18,10 +19,12 @@ const mongoUri = process.env.MONGO_URI;
 const mongoSessionUri = process.env.MONGO_SESSION_URI;
 const sessionSecret = process.env.SESSION_SECRET || "captainjohn-dev";
 const isDev = process.env.DEV === "true";
+const cookieSecure = process.env.COOKIE_SECURE === "true";
 const clientDist = path.join(__dirname, "..", "client", "dist");
 const hasClient = fs.existsSync(path.join(clientDist, "index.html"));
 
 const app = express();
+app.set("trust proxy", 1);
 
 app.use(
   cors({
@@ -46,9 +49,9 @@ app.use(
     saveUninitialized: false,
     proxy: true,
     cookie: {
-      secure: !isDev,
+      secure: cookieSecure,
       httpOnly: true,
-      sameSite: isDev ? "lax" : "none",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
     store: MongoStore.create({ mongoUrl: mongoSessionUri || mongoUri }),
@@ -65,6 +68,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+app.use("/api/auth", authRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

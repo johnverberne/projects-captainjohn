@@ -96,33 +96,63 @@ async function migrateLegacyPhoto(project, photo) {
   return photo;
 }
 
+function serializePhoto(photo, url) {
+  return {
+    _id: photo._id,
+    filename: photo.filename,
+    originalName: photo.originalName,
+    mimetype: photo.mimetype,
+    size: photo.size,
+    thumbsUp: photo.thumbsUp || 0,
+    fileId: photo.fileId,
+    url,
+  };
+}
+
 function serializeProject(project) {
   const obj =
     typeof project.toObject === "function"
       ? project.toObject({ virtuals: true })
       : { ...project };
 
-  obj.photos = (obj.photos || []).map((photo) => {
-    const id = String(photo._id);
+  const projectId = String(obj._id);
+
+  obj.photos = (obj.photos || []).map((photo) =>
+    serializePhoto(
+      photo,
+      `/api/projects/${projectId}/photos/${String(photo._id)}/file`
+    )
+  );
+
+  obj.steps = (obj.steps || []).map((step) => {
+    const stepId = String(step._id);
     return {
-      _id: photo._id,
-      filename: photo.filename,
-      originalName: photo.originalName,
-      mimetype: photo.mimetype,
-      size: photo.size,
-      thumbsUp: photo.thumbsUp || 0,
-      fileId: photo.fileId,
-      url: `/api/projects/${obj._id}/photos/${id}/file`,
+      ...step,
+      photos: (step.photos || []).map((photo) =>
+        serializePhoto(
+          photo,
+          `/api/projects/${projectId}/steps/${stepId}/photos/${String(photo._id)}/file`
+        )
+      ),
     };
   });
 
   return obj;
 }
 
+async function deletePhotos(photos) {
+  for (const photo of photos || []) {
+    await deletePhotoFile(photo.fileId);
+    const legacyPath = resolveLegacyPath(photo);
+    if (legacyPath) fs.unlinkSync(legacyPath);
+  }
+}
+
 module.exports = {
   uploadsDir,
   storePhotos,
   deletePhotoFile,
+  deletePhotos,
   openPhotoStream,
   resolveLegacyPath,
   migrateLegacyPhoto,

@@ -6,6 +6,7 @@ const PROJECT_TYPES = [
   "tiffany",
   "glas-in-lood",
   "hout",
+  "keramiek",
   "tassen",
   "overige",
 ];
@@ -26,6 +27,50 @@ const PhotoSchema = new Schema(
   { _id: true }
 );
 
+function applyGlasfusionValidation(doc) {
+  if (doc.type === "glasfusion") {
+    if (!doc.glasfusionTechnique) {
+      doc.invalidate(
+        "glasfusionTechnique",
+        "Techniek is verplicht bij glasfusion"
+      );
+    }
+    if (!doc.glasfusionSpeed) {
+      doc.invalidate("glasfusionSpeed", "Type is verplicht bij glasfusion");
+    }
+  } else {
+    doc.glasfusionTechnique = undefined;
+    doc.glasfusionSpeed = undefined;
+  }
+}
+
+const StepSchema = new Schema(
+  {
+    title: { type: String, trim: true, default: "" },
+    type: { type: String, required: true, enum: PROJECT_TYPES },
+    glasfusionTechnique: {
+      type: String,
+      enum: GLASFUSION_TECHNIQUES,
+      required: false,
+    },
+    glasfusionSpeed: {
+      type: String,
+      enum: GLASFUSION_SPEEDS,
+      required: false,
+    },
+    notes: { type: String, default: "" },
+    kwhUsage: { type: Number, min: 0, default: null },
+    costPrice: { type: Number, min: 0, default: null },
+    photos: [PhotoSchema],
+  },
+  { timestamps: true }
+);
+
+StepSchema.pre("validate", function (next) {
+  applyGlasfusionValidation(this);
+  next();
+});
+
 const ProjectSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -43,7 +88,9 @@ const ProjectSchema = new Schema(
     notes: { type: String, default: "" },
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
+    ownerEmail: { type: String, index: true, default: null },
     photos: [PhotoSchema],
+    steps: [StepSchema],
   },
   {
     timestamps: true,
@@ -53,20 +100,7 @@ const ProjectSchema = new Schema(
 );
 
 ProjectSchema.pre("validate", function (next) {
-  if (this.type === "glasfusion") {
-    if (!this.glasfusionTechnique) {
-      this.invalidate(
-        "glasfusionTechnique",
-        "Techniek is verplicht bij glasfusion"
-      );
-    }
-    if (!this.glasfusionSpeed) {
-      this.invalidate("glasfusionSpeed", "Type is verplicht bij glasfusion");
-    }
-  } else {
-    this.glasfusionTechnique = undefined;
-    this.glasfusionSpeed = undefined;
-  }
+  applyGlasfusionValidation(this);
   next();
 });
 

@@ -7,6 +7,15 @@ const projects = ref([]);
 const loading = ref(true);
 const error = ref("");
 
+function photoCount(project) {
+  const main = project.photos?.length || 0;
+  const steps = (project.steps || []).reduce(
+    (sum, step) => sum + (step.photos?.length || 0),
+    0
+  );
+  return main + steps;
+}
+
 onMounted(async () => {
   try {
     projects.value = await listProjects();
@@ -59,10 +68,18 @@ onMounted(async () => {
         <div>
           <h2 class="meta-title">{{ project.title }}</h2>
           <span class="badge">{{ typeLabel(project.type) }}</span>
+          <span
+            v-if="project.steps?.length"
+            class="badge badge-soft"
+          >
+            +{{ project.steps.length }} stap{{
+              project.steps.length === 1 ? "" : "pen"
+            }}
+          </span>
           <p class="muted" style="margin: 6px 0 0">
             {{ formatDate(project.createdAt) }}
-            · {{ project.photos?.length || 0 }} foto{{
-              (project.photos?.length || 0) === 1 ? "" : "'s"
+            · {{ photoCount(project) }} foto{{
+              photoCount(project) === 1 ? "" : "'s"
             }}
             <template v-if="project.kwhUsage != null">
               · {{ formatKwh(project.kwhUsage) }}

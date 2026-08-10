@@ -67,6 +67,42 @@ a {
   gap: 12px;
 }
 
+.brand-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-chip {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sea);
+}
+
+.btn-small {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.auth-tabs-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.auth-tabs-3 .choice {
+  font-size: 0.9rem;
+  padding: 12px 8px;
+}
+
 .brand {
   font-family: "Fraunces", Georgia, serif;
   font-weight: 700;
@@ -191,7 +227,7 @@ h2 {
 
 .choice-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -321,6 +357,66 @@ h2 {
   background: rgba(184, 92, 56, 0.12);
   padding: 4px 8px;
   border-radius: 999px;
+}
+
+.badge + .badge {
+  margin-left: 6px;
+}
+
+.badge-soft {
+  color: var(--sea);
+  background: rgba(26, 58, 58, 0.08);
+}
+
+.step-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(26, 58, 58, 0.1);
+}
+
+.step-section-head h2 {
+  margin-bottom: 4px;
+}
+
+.step-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px dashed rgba(26, 58, 58, 0.14);
+}
+
+.step-block:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.step-block-head h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.2rem;
+  margin: 8px 0 4px;
+}
+
+.step-photos-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.empty-step {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.totals-row .stat {
+  background: linear-gradient(180deg, #e8f1ef, #dceae8);
 }
 
 .muted {

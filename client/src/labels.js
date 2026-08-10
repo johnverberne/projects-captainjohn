@@ -3,6 +3,7 @@ export const TYPE_LABELS = {
   tiffany: "Tiffany",
   "glas-in-lood": "Glas in lood",
   hout: "Hout",
+  keramiek: "Keramiek",
   tassen: "Tassen",
   overige: "Overige",
 };
@@ -22,6 +23,19 @@ export const SPEED_LABELS = {
 
 export function typeLabel(type) {
   return TYPE_LABELS[type] || type;
+}
+
+export function craftSubtitle(item) {
+  if (!item) return "";
+  if (item.type !== "glasfusion") return typeLabel(item.type);
+  const tech = TECHNIQUE_LABELS[item.glasfusionTechnique] || "";
+  const speed = SPEED_LABELS[item.glasfusionSpeed] || "";
+  return [typeLabel(item.type), tech, speed].filter(Boolean).join(" · ");
+}
+
+export function stepHeading(step, index = 0) {
+  if (step?.title?.trim()) return step.title.trim();
+  return `Stap ${index + 1}: ${typeLabel(step?.type)}`;
 }
 
 export function formatDate(value) {
