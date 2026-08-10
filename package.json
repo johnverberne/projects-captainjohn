@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "install:all": "npm install && npm --prefix ./client install",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "npm run build && nodemon server/server.js",
+    "dev:vite": "concurrently \"npm run server\" \"npm run client\"",
     "server": "nodemon server/server.js",
     "client": "npm --prefix ./client run dev",
     "build": "node scripts/build-client.js",

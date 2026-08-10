@@ -2,38 +2,40 @@
 
 Mobiele Vue-website + Express JSON API + MongoDB Atlas (`project-captainjohn`).
 
-## Development (Vite)
+## Eén poort (aanbevolen)
 
-```bash
-npm run install:all
-npm run dev
-```
-
-- API: http://localhost:5055  
-- Vue (Vite): http://localhost:5173  
-
-Op je telefoon (zelfde wifi): open `http://<pc-ip>:5173`.
-
-Zet in `.env`: `DEV=true`.
-
-## Productie (zonder Vite)
-
-Bouwt de Vue-app naar `client/dist` en serveert die via Express:
+Client wordt gebouwd naar `client/dist` en door Express op `/` geserveerd:
 
 ```bash
 npm run install:all
 npm run prod
 ```
 
-Of in twee stappen:
+Of:
 
 ```bash
 npm run build
-# DEV=false (of weghalen) in .env
 npm start
 ```
 
-Open daarna alleen: http://localhost:5055 — geen Vite-devserver.
+Open: **http://localhost:5055** (API + website op dezelfde poort).
+
+Op je telefoon (zelfde wifi): `http://<pc-ip>:5055`.
+
+Lokaal met auto-restart na build:
+
+```bash
+npm run dev
+```
+
+## Optioneel: Vite apart (twee poorten)
+
+```bash
+npm run dev:vite
+```
+
+- API: http://localhost:5055  
+- Vite: http://localhost:5173  
 
 ## MongoDB
 

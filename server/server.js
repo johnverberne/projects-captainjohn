@@ -17,6 +17,7 @@ const mongoSessionUri = process.env.MONGO_SESSION_URI;
 const sessionSecret = process.env.SESSION_SECRET || "captainjohn-dev";
 const isDev = process.env.DEV === "true";
 const clientDist = path.join(__dirname, "..", "client", "dist");
+const hasClient = fs.existsSync(path.join(clientDist, "index.html"));
 
 const app = express();
 
@@ -58,20 +59,14 @@ app.get("/api/health", (_req, res) => {
     mongo: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     db: "project-captainjohn",
     mode: isDev ? "development" : "production",
+    client: hasClient ? "served" : "missing",
   });
 });
 
 app.use("/api/projects", projectsRouter);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-if (!isDev) {
-  if (!fs.existsSync(path.join(clientDist, "index.html"))) {
-    console.error(
-      "Productie-build ontbreekt. Draai eerst: npm run build"
-    );
-    process.exit(1);
-  }
-
+if (hasClient) {
   app.use(
     history({
       rewrites: [
@@ -80,10 +75,13 @@ if (!isDev) {
       ],
     })
   );
-  app.use(express.static(clientDist));
+  app.use(express.static(clientDist, { index: "index.html" }));
   app.get("*", (_req, res) => {
     res.sendFile(path.join(clientDist, "index.html"));
   });
+} else {
+  console.error("Client-build ontbreekt in client/dist. Draai: npm run build");
+  process.exit(1);
 }
 
 app.use((err, _req, res, _next) => {
@@ -93,12 +91,7 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, "0.0.0.0", () => {
   connect();
-  if (isDev) {
-    console.log(`API (dev) op http://localhost:${PORT}`);
-    console.log("Frontend: Vite via npm run dev (poort 5173)");
-  } else {
-    console.log(`Productie (zonder Vite) op http://localhost:${PORT}`);
-  }
+  console.log(`Captain John op http://localhost:${PORT} (API + client)`);
 });
 
 async function connect() {
