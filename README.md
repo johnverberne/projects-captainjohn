@@ -83,6 +83,25 @@ node scripts/make-admin.js iemand@example.com
 - Soft-delete voor projecten en stappen (terugzetten of definitief wissen)
 - Duimpjes op foto’s: publiek, max. één per sessie/gebruiker
 
+## Tests & CI
+
+GitHub Actions draait bij elke **push** en **pull request** unit-, API- en Playwright E2E-tests (met video-“film”).
+
+Lokaal (MongoDB op `127.0.0.1:27017` nodig):
+
+```bash
+npm install
+npm --prefix ./client install
+npm run build
+npm run test:node          # unit + API (supertest)
+npx playwright install chromium
+npm run test:e2e           # E2E + video in test-results/
+```
+
+Of alles: `npm test`.
+
+Artifacts in CI: `playwright-report` en `test-film-and-results` (`.webm`-video).
+
 ## MongoDB
 
 Zelfde Atlas-cluster als bdeditor, database-naam `project-captainjohn` via `MONGO_URI` in `.env`.
