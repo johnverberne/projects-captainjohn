@@ -169,10 +169,13 @@ onMounted(load);
               · {{ photoCount(project) }} foto{{
                 photoCount(project) === 1 ? "" : "'s"
               }}
-              <template v-if="project.kwhUsage != null">
+              <template v-if="project.sellingPrice != null">
+                · {{ formatEuro(project.sellingPrice) }}
+              </template>
+              <template v-if="editMode && project.kwhUsage != null">
                 · {{ formatKwh(project.kwhUsage) }}
               </template>
-              <template v-if="project.costPrice != null">
+              <template v-if="editMode && project.costPrice != null">
                 · {{ formatEuro(project.costPrice) }}
               </template>
             </p>

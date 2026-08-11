@@ -16,6 +16,7 @@ const glasfusionSpeed = defineModel("glasfusionSpeed", {
 const notes = defineModel("notes", { type: String, default: "" });
 const kwhUsage = defineModel("kwhUsage", { default: "" });
 const costPrice = defineModel("costPrice", { default: "" });
+const sellingPrice = defineModel("sellingPrice", { default: "" });
 const labels = defineModel("labels", { type: Array, default: () => [] });
 
 defineProps({
@@ -23,6 +24,7 @@ defineProps({
   idPrefix: { type: String, default: "field" },
   showTitle: { type: Boolean, default: true },
   showLabels: { type: Boolean, default: false },
+  showSellingPrice: { type: Boolean, default: false },
   titleLabel: { type: String, default: "Titel" },
   titlePlaceholder: { type: String, default: "Bijv. Blauw schaaltje" },
   typeLabelText: { type: String, default: "Soort project" },
@@ -127,6 +129,19 @@ function selectType(value) {
           placeholder="Bijv. 45.00"
         />
       </div>
+    </div>
+
+    <div v-if="showSellingPrice" class="field">
+      <label :for="`${idPrefix}-sell`">Verkoopprijs (€)</label>
+      <input
+        :id="`${idPrefix}-sell`"
+        v-model="sellingPrice"
+        type="number"
+        inputmode="decimal"
+        min="0"
+        step="0.01"
+        placeholder="Bijv. 89.00"
+      />
     </div>
 
     <LabelPicker

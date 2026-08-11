@@ -79,7 +79,9 @@ function parseOptionalNumber(value) {
   if (value === undefined || value === null || value === "") return null;
   const n = Number(String(value).replace(",", "."));
   if (!Number.isFinite(n) || n < 0) {
-    throw new Error("Kilowattverbruik en kostprijs moeten geldige getallen â‰¥ 0 zijn");
+    throw new Error(
+      "Kilowattverbruik, kostprijs en verkoopprijs moeten geldige getallen ≥ 0 zijn"
+    );
   }
   return n;
 }
@@ -93,6 +95,7 @@ function parseBody(body) {
     notes: body.notes || "",
     kwhUsage: parseOptionalNumber(body.kwhUsage),
     costPrice: parseOptionalNumber(body.costPrice),
+    sellingPrice: parseOptionalNumber(body.sellingPrice),
     labels: parseLabelsInput(body.labels),
   };
 }
@@ -139,13 +142,24 @@ function applyThumb(photo, voterId) {
   return { ok: true, already: false };
 }
 
+function stripInternalCosts(obj) {
+  delete obj.kwhUsage;
+  delete obj.costPrice;
+  for (const step of obj.steps || []) {
+    delete step.kwhUsage;
+    delete step.costPrice;
+  }
+  return obj;
+}
+
 function serializeForClient(project, req) {
   const obj = serializeProject(project, { voterId: peekVoterId(req) });
-  const canSeeDeletedSteps =
+  const canSeeInternal =
     Boolean(req.session?.email) &&
     canAccessProject(project, req.session.email, req);
-  if (!canSeeDeletedSteps) {
+  if (!canSeeInternal) {
     obj.steps = (obj.steps || []).filter((step) => !step.deletedAt);
+    return stripInternalCosts(obj);
   }
   return obj;
 }
@@ -340,6 +354,7 @@ router.post("/", isAuthenticated, upload.array("photos", 20), async (req, res) =
       notes: data.notes,
       kwhUsage: data.kwhUsage,
       costPrice: data.costPrice,
+      sellingPrice: data.sellingPrice,
       labels,
       photos,
       steps: [],
@@ -369,6 +384,9 @@ router.put("/:id", isAuthenticated, upload.array("photos", 20), async (req, res)
     if (typeof req.body.notes === "string") project.notes = data.notes;
     if (req.body.kwhUsage !== undefined) project.kwhUsage = data.kwhUsage;
     if (req.body.costPrice !== undefined) project.costPrice = data.costPrice;
+    if (req.body.sellingPrice !== undefined) {
+      project.sellingPrice = data.sellingPrice;
+    }
     if (data.labels !== null) {
       project.labels = data.labels;
       await upsertCatalogLabels(data.labels, req.session.email);
