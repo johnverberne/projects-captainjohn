@@ -102,9 +102,6 @@ onMounted(load);
             : "Bekijk de atelierprojecten van Captain John."
         }}
       </p>
-      <p v-if="!editMode" class="muted" style="margin: 0">
-        Alleen kijken — om te wijzigen log je in.
-      </p>
     </div>
 
     <router-link
