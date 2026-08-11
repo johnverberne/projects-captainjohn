@@ -93,6 +93,18 @@ export function thumbPhoto(projectId, photoId) {
   return thumbRequest(`/api/projects/${projectId}/photos/${photoId}/thumb`);
 }
 
+export function setCoverPhoto(projectId, photoId) {
+  return request(`/api/projects/${projectId}/photos/${photoId}/cover`, {
+    method: "POST",
+  });
+}
+
+export function deletePhoto(projectId, photoId) {
+  return request(`/api/projects/${projectId}/photos/${photoId}`, {
+    method: "DELETE",
+  });
+}
+
 export function addStep(projectId, formData) {
   return request(`/api/projects/${projectId}/steps`, {
     method: "POST",
@@ -135,6 +147,13 @@ export function addStepPhotos(projectId, stepId, formData) {
 export function thumbStepPhoto(projectId, stepId, photoId) {
   return thumbRequest(
     `/api/projects/${projectId}/steps/${stepId}/photos/${photoId}/thumb`
+  );
+}
+
+export function deleteStepPhoto(projectId, stepId, photoId) {
+  return request(
+    `/api/projects/${projectId}/steps/${stepId}/photos/${photoId}`,
+    { method: "DELETE" }
   );
 }
 

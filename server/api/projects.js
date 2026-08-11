@@ -17,6 +17,8 @@ const {
   migrateLegacyPhoto,
   serializePhoto,
   serializeProject,
+  ensureProjectCover,
+  setProjectCover,
 } = require("../services/photoStorage");
 const { isAuthenticated } = require("../middleware/auth");
 const {
@@ -407,6 +409,7 @@ router.post("/", isAuthenticated, upload.array("photos", 20), async (req, res) =
     }
 
     const photos = await storePhotos(req.files);
+    if (photos.length) photos[0].isCover = true;
     const labels = data.labels || [];
     const project = new Project({
       title: data.title,
@@ -456,6 +459,7 @@ router.put("/:id", isAuthenticated, upload.array("photos", 20), async (req, res)
 
     if (req.files?.length) {
       project.photos.push(...(await storePhotos(req.files)));
+      ensureProjectCover(project);
     }
 
     await project.save();
@@ -474,6 +478,7 @@ router.post("/:id/photos", isAuthenticated, upload.array("photos", 20), async (r
     }
     claimOwner(project, req.session.email);
     project.photos.push(...(await storePhotos(req.files)));
+    ensureProjectCover(project);
     await project.save();
     res.json(serializeForClient(project, req));
   } catch (error) {
@@ -505,6 +510,23 @@ router.post("/:id/photos/:photoId/thumb", async (req, res) => {
   }
 });
 
+router.post("/:id/photos/:photoId/cover", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
+    if (!project) return;
+    claimOwner(project, req.session.email);
+
+    if (!setProjectCover(project, req.params.photoId)) {
+      return res.status(404).json({ error: "Foto niet gevonden" });
+    }
+
+    await project.save();
+    res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 router.delete("/:id/photos/:photoId", isAuthenticated, async (req, res) => {
   try {
     const project = await loadAccessibleProject(req, res, { requireActive: true });
@@ -518,6 +540,7 @@ router.delete("/:id/photos/:photoId", isAuthenticated, async (req, res) => {
     if (legacyPath) fs.unlinkSync(legacyPath);
 
     photo.deleteOne();
+    ensureProjectCover(project);
     await project.save();
     res.json(serializeForClient(project, req));
   } catch (error) {

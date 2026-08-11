@@ -70,6 +70,7 @@ erDiagram
     number size
     number thumbsUp
     string thumbedBy
+    boolean isCover
   }
 
   LABEL {
@@ -172,7 +173,10 @@ Photo
 ├── url                     # legacy / afgeleid bij serialisatie
 ├── thumbsUp: Number
 ├── thumbedBy: [String]     # voter-id's (user:email of anon:uuid)
+├── isCover: Boolean        # hoofdfoto op projectkaart (alleen projectfoto’s)
 ```
+
+Maximaal één projectfoto heeft `isCover: true`. Zonder markering valt de UI terug op de eerste foto.
 
 ### Step (embedded)
 

@@ -104,6 +104,6 @@ Artifacts in CI: `playwright-report` en `test-film-and-results` (`.webm`-video).
 
 ## MongoDB
 
-Zelfde Atlas-cluster als bdeditor, database-naam `project-captainjohn` via `MONGO_URI` in `.env`.
+Database-naam `project-captainjohn` via `MONGO_URI` in `.env`.
 
 Details: [docs/DATABASE.md](./docs/DATABASE.md).

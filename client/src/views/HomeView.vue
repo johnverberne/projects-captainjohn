@@ -14,6 +14,7 @@ import {
   formatEuro,
   hasSellingPrice,
   labelChipStyle,
+  displayPhoto,
 } from "../labels";
 
 const route = useRoute();
@@ -176,9 +177,9 @@ onMounted(load);
           :to="projectLink(project)"
         >
           <img
-            v-if="project.photos?.[0]"
+            v-if="displayPhoto(project)?.url"
             class="thumb"
-            :src="project.photos[0].url"
+            :src="displayPhoto(project).url"
             :alt="project.title"
           />
           <div v-else class="thumb placeholder">geen foto</div>
@@ -237,9 +238,9 @@ onMounted(load);
           >
             <router-link class="project-card-main" :to="projectLink(project)">
               <img
-                v-if="project.photos?.[0]"
+                v-if="displayPhoto(project)"
                 class="thumb"
-                :src="project.photos[0].url"
+                :src="displayPhoto(project).url"
                 :alt="project.title"
               />
               <div v-else class="thumb placeholder">geen foto</div>

@@ -167,6 +167,51 @@ describe("API: health, auth, projects", () => {
       .expect(409);
   });
 
+  it("hoofdfoto markeren en foto verwijderen", async () => {
+    await agent
+      .post("/api/auth/login")
+      .send({ email: TEST_USER.email, pw: TEST_USER.password })
+      .expect(200);
+
+    const Project = require("../../server/model/project.model");
+    const project = await Project.create({
+      title: "Cover project",
+      type: "overige",
+      ownerEmail: TEST_USER.email,
+      photos: [
+        {
+          filename: "a.jpg",
+          originalName: "a.jpg",
+          mimetype: "image/jpeg",
+          size: 10,
+          isCover: true,
+        },
+        {
+          filename: "b.jpg",
+          originalName: "b.jpg",
+          mimetype: "image/jpeg",
+          size: 10,
+          isCover: false,
+        },
+      ],
+    });
+    const firstId = project.photos[0]._id;
+    const secondId = project.photos[1]._id;
+
+    const covered = await agent
+      .post(`/api/projects/${project._id}/photos/${secondId}/cover`)
+      .expect(200);
+    assert.equal(covered.body.photos.find((p) => p._id === String(secondId)).isCover, true);
+    assert.equal(covered.body.photos.find((p) => p._id === String(firstId)).isCover, false);
+
+    const deleted = await agent
+      .delete(`/api/projects/${project._id}/photos/${secondId}`)
+      .expect(200);
+    assert.equal(deleted.body.photos.length, 1);
+    assert.equal(deleted.body.photos[0]._id, String(firstId));
+    assert.equal(deleted.body.photos[0].isCover, true);
+  });
+
   it("featured foto is die met de meeste duimpjes", async () => {
     const Project = require("../../server/model/project.model");
     const low = await Project.create({

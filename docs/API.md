@@ -84,6 +84,7 @@ Query’s op `GET /api/projects`:
 | GET | `/api/projects/:id/photos/:photoId/file` | open | Foto streamen |
 | POST | `/api/projects/:id/photos` | login | Foto’s toevoegen (multipart `photos`) |
 | POST | `/api/projects/:id/photos/:photoId/thumb` | open | Duimpje (max. 1× per sessie/gebruiker) |
+| POST | `/api/projects/:id/photos/:photoId/cover` | login | Foto als hoofdfoto markeren (projectkaart) |
 | DELETE | `/api/projects/:id/photos/:photoId` | login | Foto verwijderen |
 
 ### Stappen
