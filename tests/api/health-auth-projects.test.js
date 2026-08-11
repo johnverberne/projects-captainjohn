@@ -244,6 +244,7 @@ describe("API: health, auth, projects", () => {
       steps: [
         {
           title: "Stap",
+          type: "overige",
           photos: [
             {
               filename: "step.jpg",

@@ -47,7 +47,7 @@ test("film: publiek bekijken → inloggen → bewerken → prullenbak", async ({
   await expect(page).toHaveURL(/\/inloggen/);
   await page.locator("#email").fill(E2E_EMAIL);
   await page.locator("#password").fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: "Inloggen" }).click();
+  await page.locator("button.btn-primary").filter({ hasText: /^Inloggen$/ }).click();
   await expect(page).toHaveURL(/\/bewerken/);
   await expect(
     page.getByText(/Bewerk je atelierprojecten vanaf je telefoon/i)
@@ -82,7 +82,7 @@ test("film: publiek bekijken → inloggen → bewerken → prullenbak", async ({
   await expect(page.getByText("Afwerking").first()).toBeVisible();
 
   // 6) Soft-delete project → prullenbak → terugzetten
-  await page.getByRole("button", { name: "Verwijderen" }).click();
+  await page.getByRole("button", { name: "Verwijderen", exact: true }).click();
   await expect(page).toHaveURL(/\/bewerken\/?$/);
   await expect(page.getByText("Verwijderde projecten")).toBeVisible();
   await expect(page.getByText("E2E film project")).toBeVisible();

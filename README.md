@@ -82,6 +82,7 @@ node scripts/make-admin.js iemand@example.com
 - Labels met kleur (kiezen of nieuw toevoegen)
 - Soft-delete voor projecten en stappen (terugzetten of definitief wissen)
 - Duimpjes op foto’s: publiek, max. één per sessie/gebruiker
+- PDF-export (ingelogd): knop **Export** in de topbalk → rapport van alle projecten (incl. prullenbak) met voorpagina, headers en footers
 
 ## Tests & CI
 

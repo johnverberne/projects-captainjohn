@@ -83,6 +83,15 @@ a {
   color: var(--sea);
 }
 
+.export-error {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(155, 44, 44, 0.1);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
 .btn-small {
   padding: 8px 12px;
   font-size: 0.85rem;
