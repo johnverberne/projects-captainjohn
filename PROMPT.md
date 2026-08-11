@@ -10,7 +10,7 @@ Bouw de volledige applicatie **Captain John — Atelierprojecten** vanaf nul, al
 ## Product
 Nederlandstalige, mobile-first atelier-projecttracker voor craft-projecten (glasfusion, tiffany, glas-in-lood, hout, keramiek, tassen, overige).
 - Publiek: projecten bekijken, detail openen, duimpjes op foto’s, featured foto met meeste likes, verkoopprijs tonen als gezet.
-- Ingelogd: CRUD voor projecten, stappen (“extra stappen”), foto’s (galerij/camera), labels met kleur, kWh/kostprijs/verkoopprijs, soft-delete prullenbak (herstellen/definitief wissen).
+- Ingelogd: CRUD voor projecten, stappen (“extra stappen”), foto’s (galerij/camera), hoofdfoto markeren voor projectkaart, foto’s direct verwijderen, labels met kleur, kWh/kostprijs/verkoopprijs, soft-delete prullenbak (herstellen/definitief wissen).
 - Toegang op uitnodiging: “Aanmelden” = aanvraag (naam, e-mail, reden). Admin keurt goed/af via e-maillinks. Bij goedkeuring: gegenereerd niceware-wachtwoord (argon2) per mail. Geen zelfgekozen wachtwoord bij signup.
 - Merk: “Captain John / atelier projecten”. UI-taal: Nederlands.
 
@@ -81,7 +81,10 @@ Documenteer `sellingPrice` in zowel `docs/DATABASE.md` als `docs/API.md` (multip
 Zelfde craft-velden als project (title optioneel), eigen photos, eigen soft-delete. Geen sellingPrice / project-labels.
 
 ### Photo (embedded)
-fileId (GridFS), filename, originalName, mimetype, size, legacy url, thumbsUp, thumbedBy[] (`user:email` of `anon:uuid`). API serialiseert met url-pad + thumbedByMe.
+fileId (GridFS), filename, originalName, mimetype, size, legacy url, thumbsUp, thumbedBy[] (`user:email` of `anon:uuid`), `isCover` (Boolean; alleen projectfoto’s).
+API serialiseert met url-pad + thumbedByMe + isCover.
+Maximaal één projectfoto heeft `isCover: true`. Helpers in `photoStorage.js`: `ensureProjectCover`, `setProjectCover`.
+Bij create met foto’s: eerste foto wordt cover. Na delete of upload zonder cover: `ensureProjectCover` (fallback eerste foto).
 
 ### Label (catalogus)
 name, nameKey (unique lowercase), color hex (fallback `#2a5554`, 3-digit hex expand), createdBy. Project bewaart een kopie; opslaan upsert catalogus (max 20 labels/project, naam ≤40 chars).
@@ -113,13 +116,15 @@ Gedrag & copy:
 - Edit lead: `Bewerk je atelierprojecten vanaf je telefoon.`
 - Public detail hint: `Publieke weergave — alleen bekijken.`
 - CTA: `Nieuw project starten`; trash heading: `Verwijderde projecten`
-- Home: logo-hero, featured foto, projectcards (thumb, type-badge, stappen-count, labels, datum, fotocount, sellingPrice alleen als gezet)
+- Home: logo-hero, featured foto, projectcards (thumb via `displayPhoto()` = isCover of eerste foto, type-badge, stappen-count, labels, datum, fotocount, sellingPrice alleen als gezet)
 - Detail publiek: notes, fotogrid+thumbs, steps, lightbox (Esc); geen edit
 - Edit detail modes: view / edit-project / add-step / edit-step; totals kWh/cost over project+steps; confirm dialogs voor delete/restore/purge
+- Edit foto’s: badge “Hoofdfoto”, knop “Als hoofdfoto”, rode × verwijderen (project- én stapfoto’s); lightbox-actions: Als hoofdfoto / Verwijderen / duimpje; projectfoto’s gesorteerd met cover eerst; hint “Markeer een hoofdfoto…”
 - PhotoUploadPicker: “Lokale foto” / “Foto nemen” (`capture="environment"`)
 - LabelPicker: catalogus-toggle + swatches `#b85c38 #1a3a3a #2f6b4f #3d5a80 #8b3a4a #6b4f3a #c4a35a #4a6670` + custom color
 - ProjectOptionFields: gedeelde type/glasfusion/kWh/cost/notes/labels/selling velden
-- `client/src/labels.js`: TYPE_LABELS / TECHNIQUE_LABELS / SPEED_LABELS, craftSubtitle, stepHeading, formatDate/formatKwh/formatEuro, hasSellingPrice, labelChipStyle
+- `client/src/labels.js`: TYPE_LABELS / TECHNIQUE_LABELS / SPEED_LABELS, craftSubtitle, stepHeading, formatDate/formatKwh/formatEuro, hasSellingPrice, displayPhoto, labelChipStyle
+- `client/src/api.js`: o.a. setCoverPhoto, deletePhoto, deleteStepPhoto
 - Client fetch met `credentials: "include"`; thumb 409+project body behandelen als succespayload
 - Guest login met `return` die met `/api` start → `window.location.replace` (full navigation)
 - nl-NL formatting; max-width ~640px; safe-area padding
@@ -154,10 +159,11 @@ Catalogusgroepen: Algemeen, Auth, Projecten, Projectfoto’s, Stappen.
 - DELETE `/api/projects/:id/permanent` (alleen na soft-delete) → `{ ok: true }`
 - Projectfoto’s: GET `…/photos/:photoId/file`, POST `…/photos`, DELETE `…/photos/:photoId`
 - POST `…/photos/:photoId/thumb` — publiek; 409 als al geduimd, body bevat nog steeds `project`
-- Stappen: POST/PUT/DELETE `…/steps[/:stepId]`, restore, permanent, nested photo file/upload/thumb/delete
+- POST `…/photos/:photoId/cover` — login; markeer als hoofdfoto (projectkaart); andere covers uit
+- Stappen: POST/PUT/DELETE `…/steps[/:stepId]`, restore, permanent, nested photo file/upload/thumb/delete (geen cover op stapfoto’s)
 - Typische errors: 400 validatie, 403 rechten, 404 missing/deleted public, 409 double thumb
 
-Documenteer alles in `docs/API.md` en `docs/DATABASE.md` (inclusief sellingPrice en nested foto/stap-paden).
+Documenteer alles in `docs/API.md` en `docs/DATABASE.md` (inclusief sellingPrice, isCover, cover-endpoint en nested foto/stap-paden).
 
 ## Env
 ### `.env.example` (productie/dev)
@@ -177,6 +183,7 @@ Helpers: `node scripts/create-user.js <email> <password> [name]`, `node scripts/
 - CSS vars: --ink #1c2422, --ink-soft #3d4a46, --paper #f3efe6, --paper-deep #e4ddd0, --sea #1a3a3a, --sea-mid #2a5554, --copper #b85c38, --copper-deep #8f4024, --ok #2f6b4f, --danger #9b2c2c, --fog rgba(28,36,34,0.08), --radius 14px, --shadow 0 18px 40px rgba(26,58,58,0.12)
 - Achtergrond: gelaagde radial gradients (teal + copper wash) over warm paper — geen flat white
 - Frosted panels, soft shadow, primary buttons met sea-gradient, choice tiles met active teal wash
+- Foto-UI: cover-badge (copper), cover-chip, photo-delete (danger ×), photo-tile.cover ring, lightbox-actions rij
 - Logo PNG hero op home; brand-bar altijd productnaam als primaire identiteit
 - index.html: theme-color #1a3a3a, apple-mobile-web-app-capable, viewport-fit=cover
 - Motion: lichte hover-lift op featured foto; button :active scale 0.98; choice transitions
@@ -188,7 +195,7 @@ Helpers: `node scripts/create-user.js <email> <password> [name]`, `node scripts/
 
 ### API
 `tests/api/health-auth-projects.test.js` via supertest + `createApp({ allowNoClient: true })` en helpers (`tests/helpers/*`).
-Cover: health, login/me, public list, auth-required create, soft-delete/restore, steps, thumbs 409, featured, `/api` docs login.
+Cover: health, login/me, public list, auth-required create, soft-delete/restore, steps, thumbs 409, cover markeren + foto delete (ensureCover na delete), featured, `/api` docs login.
 Helper-user: `tester@example.com` / `test-pass-123` (admin+editor); DB `project-captainjohn-test`.
 (Invite create-confirm/deny hoeft niet in API-tests tenzij je die flow apart toevoegt.)
 
@@ -203,14 +210,14 @@ Helper-user: `tester@example.com` / `test-pass-123` (admin+editor); DB `project-
 Lokaal: Mongo op `127.0.0.1:27017`; `npx playwright install chromium` vóór e2e.
 
 ## README
-Nederlandse README met: docs-tabel (DATABASE.md + API.md), route-tabel (incl. `/api`), één-poort workflow, optionele Vite-dev, account/invite-flow, functies (incl. verkoopprijs + GridFS + soft-delete + duimpjes), tests/CI (artifacts), MongoDB-notitie (`project-captainjohn`).
+Nederlandse README met: docs-tabel (DATABASE.md + API.md), route-tabel (incl. `/api`), één-poort workflow, optionele Vite-dev, account/invite-flow, functies (incl. verkoopprijs + GridFS + hoofdfoto + foto-delete + soft-delete + duimpjes), tests/CI (artifacts), MongoDB-notitie (`project-captainjohn`).
 
 ## Implementatievolgorde
 1. Root package + createApp + health + SPA serve + static /uploads
 2. Mongoose models (*.model.js) + db + session store
 3. Auth API + mail + invite approve/deny + reset
-4. Projects/steps/photos/labels API + GridFS + legacy migratie
-5. endpointCatalog + /api docs pagina + docs/* (sellingPrice meenemen)
+4. Projects/steps/photos/labels API + GridFS + legacy migratie + cover/delete foto’s
+5. endpointCatalog + /api docs pagina + docs/* (sellingPrice + isCover meenemen)
 6. Vue client (router, api, auth, labels, views, components, styles)
 7. Scripts (build, prod, create-user, make-admin, seed-e2e, test-server)
 8. Unit + API + Playwright film + CI
@@ -222,6 +229,7 @@ Nederlandse README met: docs-tabel (DATABASE.md + API.md), route-tabel (incl. `/
 - Verkoopprijs zichtbaar publiek alleen als gezet; kWh/kostprijs nooit publiek
 - Invite → admin approve → login met gemaild wachtwoord werkt (of SMTP-log / devPassword fallback)
 - Ingelogd: project/stap/foto/label CRUD + soft-delete trash
+- Hoofdfoto markeren wijzigt projectkaart-thumb; foto direct verwijderen werkt voor project- en stapfoto’s
 - `npm run test:node` en `npm run test:e2e` groen met lokale Mongo
 - Design volgt sea/copper/paper + Fraunces look, niet een generiek paars/cream template
 
