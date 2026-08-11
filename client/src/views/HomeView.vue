@@ -1,7 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { listProjects, purgeProject, restoreProject } from "../api";
+import {
+  getFeaturedPhoto,
+  listProjects,
+  purgeProject,
+  restoreProject,
+} from "../api";
 import { typeLabel, formatDate, formatKwh, formatEuro, labelChipStyle } from "../labels";
 
 const route = useRoute();
@@ -9,6 +14,7 @@ const route = useRoute();
 const editMode = computed(() => Boolean(route.meta.editMode));
 const projects = ref([]);
 const deletedProjects = ref([]);
+const featured = ref(null);
 const loading = ref(true);
 const error = ref("");
 const busyId = ref("");
@@ -27,11 +33,22 @@ function projectLink(project) {
     : `/project/${project._id}`;
 }
 
+function featuredLink(item) {
+  return editMode.value
+    ? `/bewerken/project/${item.projectId}`
+    : `/project/${item.projectId}`;
+}
+
 async function load() {
   loading.value = true;
   error.value = "";
   try {
-    projects.value = await listProjects();
+    const [list, topPhoto] = await Promise.all([
+      listProjects(),
+      getFeaturedPhoto(),
+    ]);
+    projects.value = list;
+    featured.value = topPhoto;
     if (editMode.value) {
       deletedProjects.value = await listProjects({ deleted: true });
     } else {
@@ -102,6 +119,26 @@ onMounted(load);
             : "Bekijk de atelierprojecten van Captain John."
         }}
       </p>
+
+      <router-link
+        v-if="featured?.photo?.url"
+        class="featured-photo"
+        :to="featuredLink(featured)"
+      >
+        <img
+          class="featured-photo-img"
+          :src="featured.photo.url"
+          :alt="featured.projectTitle"
+        />
+        <div class="featured-photo-caption">
+          <strong>{{ featured.projectTitle }}</strong>
+          <span class="muted">
+            Meest geliked · {{ featured.photo.thumbsUp }} duimpje{{
+              featured.photo.thumbsUp === 1 ? "" : "s"
+            }}
+          </span>
+        </div>
+      </router-link>
     </div>
 
     <router-link

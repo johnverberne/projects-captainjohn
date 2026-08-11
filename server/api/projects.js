@@ -15,6 +15,7 @@ const {
   openPhotoStream,
   resolveLegacyPath,
   migrateLegacyPhoto,
+  serializePhoto,
   serializeProject,
 } = require("../services/photoStorage");
 const { isAuthenticated } = require("../middleware/auth");
@@ -262,6 +263,67 @@ router.get("/meta", async (_req, res) => {
         name: item.name,
         color: item.color,
       })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Foto met de meeste duimpjes (project- + stapfoto’s), voor de homepage. */
+router.get("/featured", async (req, res) => {
+  try {
+    const projects = await Project.find(notDeletedFilter());
+    let best = null;
+
+    for (const project of projects) {
+      const projectId = String(project._id);
+      for (const photo of project.photos || []) {
+        const thumbsUp = photo.thumbsUp || 0;
+        if (thumbsUp <= 0) continue;
+        if (!best || thumbsUp > best.thumbsUp) {
+          best = {
+            projectId,
+            stepId: null,
+            projectTitle: project.title,
+            thumbsUp,
+            photo,
+          };
+        }
+      }
+      for (const step of project.steps || []) {
+        if (isStepDeleted(step)) continue;
+        const stepId = String(step._id);
+        for (const photo of step.photos || []) {
+          const thumbsUp = photo.thumbsUp || 0;
+          if (thumbsUp <= 0) continue;
+          if (!best || thumbsUp > best.thumbsUp) {
+            best = {
+              projectId,
+              stepId,
+              projectTitle: project.title,
+              thumbsUp,
+              photo,
+            };
+          }
+        }
+      }
+    }
+
+    if (!best) {
+      return res.json(null);
+    }
+
+    const url = best.stepId
+      ? `/api/projects/${best.projectId}/steps/${best.stepId}/photos/${String(
+          best.photo._id
+        )}/file`
+      : `/api/projects/${best.projectId}/photos/${String(best.photo._id)}/file`;
+
+    res.json({
+      projectId: best.projectId,
+      stepId: best.stepId,
+      projectTitle: best.projectTitle,
+      photo: serializePhoto(best.photo, url, peekVoterId(req)),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

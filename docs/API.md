@@ -62,6 +62,7 @@ Legenda auth: **open** = geen login, **login** = sessie verplicht.
 | Method | Pad | Auth | Beschrijving |
 |---|---|---|---|
 | GET | `/api/projects/meta` | open | Types, glasfusion-opties, labelcatalogus |
+| GET | `/api/projects/featured` | open | Foto met de meeste duimpjes (homepage) |
 | GET | `/api/projects` | open | Lijst projecten (`?deleted=1`, `?mine=1`) |
 | POST | `/api/projects` | login | Nieuw project (multipart) |
 | GET | `/api/projects/:id` | open | Project ophalen |

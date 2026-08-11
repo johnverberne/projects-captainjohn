@@ -43,6 +43,10 @@ export function getMeta() {
   return request("/api/projects/meta");
 }
 
+export function getFeaturedPhoto() {
+  return request("/api/projects/featured");
+}
+
 export function listProjects({ deleted = false, mine = false } = {}) {
   const params = new URLSearchParams();
   if (deleted) params.set("deleted", "1");

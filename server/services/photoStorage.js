@@ -163,5 +163,6 @@ module.exports = {
   openPhotoStream,
   resolveLegacyPath,
   migrateLegacyPhoto,
+  serializePhoto,
   serializeProject,
 };
