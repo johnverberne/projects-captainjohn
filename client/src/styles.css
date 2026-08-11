@@ -139,6 +139,46 @@ a {
   object-fit: contain;
 }
 
+.featured-photo {
+  display: block;
+  width: min(100%, 420px);
+  margin-top: 8px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid rgba(26, 58, 58, 0.1);
+  background: rgba(255, 255, 255, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.featured-photo:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(26, 58, 58, 0.12);
+}
+
+.featured-photo-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: rgba(26, 58, 58, 0.06);
+}
+
+.featured-photo-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  text-align: left;
+}
+
+.featured-photo-caption strong {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
 .panel {
   background: rgba(255, 252, 246, 0.82);
   border: 1px solid rgba(26, 58, 58, 0.08);

@@ -12,7 +12,14 @@
     "client": "npm --prefix ./client run dev",
     "build": "node scripts/build-client.js",
     "start": "node server/server.js",
-    "prod": "npm run build && node scripts/prod.js"
+    "prod": "npm run build && node scripts/prod.js",
+    "test": "npm run test:node && npm run test:e2e",
+    "test:unit": "node --test \"tests/unit/**/*.test.js\"",
+    "test:api": "node --test \"tests/api/**/*.test.js\"",
+    "test:node": "node --test \"tests/unit/**/*.test.js\" \"tests/api/**/*.test.js\"",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "seed:e2e": "node scripts/seed-e2e.js"
   },
   "dependencies": {
     "argon2": "^0.44.0",
@@ -29,7 +36,9 @@
     "nodemailer": "^9.0.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.0",
     "concurrently": "^9.1.2",
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "supertest": "^7.0.0"
   }
 }

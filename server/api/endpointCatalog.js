@@ -75,6 +75,12 @@ const ENDPOINTS = [
       },
       {
         method: "GET",
+        path: "/api/projects/featured",
+        auth: false,
+        description: "Foto met de meeste duimpjes voor de homepage (publiek)",
+      },
+      {
+        method: "GET",
         path: "/api/projects",
         auth: false,
         description: "Lijst projecten (publiek; ?deleted=1 admin; ?mine=1 eigen)",

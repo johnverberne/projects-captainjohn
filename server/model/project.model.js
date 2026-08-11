@@ -99,6 +99,7 @@ const ProjectSchema = new Schema(
     notes: { type: String, default: "" },
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
+    sellingPrice: { type: Number, min: 0, default: null },
     ownerEmail: { type: String, index: true, default: null },
     deletedAt: { type: Date, default: null, index: true },
     deletedBy: { type: String, default: null },

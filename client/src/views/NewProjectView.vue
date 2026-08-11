@@ -22,6 +22,7 @@ const glasfusionSpeed = ref("");
 const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
+const sellingPrice = ref("");
 const projectLabels = ref([]);
 const files = ref([]);
 const previews = ref([]);
@@ -85,6 +86,7 @@ async function submit() {
     form.append("notes", notes.value);
     form.append("kwhUsage", kwhUsage.value);
     form.append("costPrice", costPrice.value);
+    form.append("sellingPrice", sellingPrice.value);
     form.append("labels", JSON.stringify(projectLabels.value || []));
     if (isGlasfusion.value) {
       form.append("glasfusionTechnique", glasfusionTechnique.value);
@@ -214,6 +216,19 @@ async function submit() {
           placeholder="Bijv. 45.00"
         />
       </div>
+    </div>
+
+    <div class="field">
+      <label for="sellingPrice">Verkoopprijs (€)</label>
+      <input
+        id="sellingPrice"
+        v-model="sellingPrice"
+        type="number"
+        inputmode="decimal"
+        min="0"
+        step="0.01"
+        placeholder="Bijv. 89.00"
+      />
     </div>
 
     <LabelPicker v-model="projectLabels" :catalog="meta.labels || []" />

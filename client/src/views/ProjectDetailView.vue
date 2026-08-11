@@ -31,6 +31,7 @@ import {
   formatDate,
   formatKwh,
   formatEuro,
+  hasSellingPrice,
   labelChipStyle,
 } from "../labels";
 
@@ -67,6 +68,7 @@ const glasfusionSpeed = ref("");
 const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
+const sellingPrice = ref("");
 const projectLabels = ref([]);
 const stepFiles = ref([]);
 const stepPreviews = ref([]);
@@ -180,6 +182,7 @@ function resetForm() {
   notes.value = "";
   kwhUsage.value = "";
   costPrice.value = "";
+  sellingPrice.value = "";
   projectLabels.value = [];
   clearStepFiles();
 }
@@ -192,6 +195,7 @@ function fillForm(item) {
   notes.value = item.notes || "";
   kwhUsage.value = item.kwhUsage ?? "";
   costPrice.value = item.costPrice ?? "";
+  sellingPrice.value = item.sellingPrice ?? "";
   projectLabels.value = (item.labels || []).map((label) => ({
     name: label.name,
     color: label.color,
@@ -258,13 +262,20 @@ function validateForm({ requireTitle }) {
   return true;
 }
 
-function buildFormData({ includePhotos = false, includeLabels = false } = {}) {
+function buildFormData({
+  includePhotos = false,
+  includeLabels = false,
+  includeSellingPrice = false,
+} = {}) {
   const form = new FormData();
   form.append("title", title.value.trim());
   form.append("type", type.value);
   form.append("notes", notes.value);
   form.append("kwhUsage", kwhUsage.value);
   form.append("costPrice", costPrice.value);
+  if (includeSellingPrice) {
+    form.append("sellingPrice", sellingPrice.value);
+  }
   if (isGlasfusion.value) {
     form.append("glasfusionTechnique", glasfusionTechnique.value);
     form.append("glasfusionSpeed", glasfusionSpeed.value);
@@ -284,7 +295,7 @@ async function saveProjectEdit() {
   try {
     project.value = await updateProject(
       route.params.id,
-      buildFormData({ includeLabels: true })
+      buildFormData({ includeLabels: true, includeSellingPrice: true })
     );
     meta.value = {
       ...meta.value,
@@ -512,9 +523,11 @@ async function purge() {
         v-model:notes="notes"
         v-model:kwh-usage="kwhUsage"
         v-model:cost-price="costPrice"
+        v-model:selling-price="sellingPrice"
         v-model:labels="projectLabels"
         :meta="meta"
         :show-labels="true"
+        :show-selling-price="true"
         id-prefix="edit-project"
       />
 
@@ -624,14 +637,22 @@ async function purge() {
       </div>
 
       <div
-        v-if="project.kwhUsage != null || project.costPrice != null"
+        v-if="
+          hasSellingPrice(project.sellingPrice) ||
+          (editMode &&
+            (project.kwhUsage != null || project.costPrice != null))
+        "
         class="stats-row"
       >
-        <div v-if="project.kwhUsage != null" class="stat">
+        <div v-if="hasSellingPrice(project.sellingPrice)" class="stat">
+          <span class="stat-label">Verkoopprijs</span>
+          <strong>{{ formatEuro(project.sellingPrice) }}</strong>
+        </div>
+        <div v-if="editMode && project.kwhUsage != null" class="stat">
           <span class="stat-label">Verbruik</span>
           <strong>{{ formatKwh(project.kwhUsage) }}</strong>
         </div>
-        <div v-if="project.costPrice != null" class="stat">
+        <div v-if="editMode && project.costPrice != null" class="stat">
           <span class="stat-label">Kostprijs</span>
           <strong>{{ formatEuro(project.costPrice) }}</strong>
         </div>
@@ -723,7 +744,10 @@ async function purge() {
           </div>
 
           <div
-            v-if="step.kwhUsage != null || step.costPrice != null"
+            v-if="
+              editMode &&
+              (step.kwhUsage != null || step.costPrice != null)
+            "
             class="stats-row"
           >
             <div v-if="step.kwhUsage != null" class="stat">
@@ -866,7 +890,11 @@ async function purge() {
       </div>
 
       <div
-        v-if="steps.length && (totals.kwh != null || totals.cost != null)"
+        v-if="
+          editMode &&
+          steps.length &&
+          (totals.kwh != null || totals.cost != null)
+        "
         class="stats-row totals-row"
       >
         <div v-if="totals.kwh != null" class="stat">
