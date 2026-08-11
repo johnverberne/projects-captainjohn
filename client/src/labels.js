@@ -64,6 +64,11 @@ export function formatEuro(value) {
   });
 }
 
+export function hasSellingPrice(value) {
+  if (value === null || value === undefined || value === "") return false;
+  return Number.isFinite(Number(value));
+}
+
 export function labelChipStyle(color) {
   const hex = String(color || "#2a5554").replace("#", "");
   const full =

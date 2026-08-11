@@ -7,7 +7,14 @@ import {
   purgeProject,
   restoreProject,
 } from "../api";
-import { typeLabel, formatDate, formatKwh, formatEuro, labelChipStyle } from "../labels";
+import {
+  typeLabel,
+  formatDate,
+  formatKwh,
+  formatEuro,
+  hasSellingPrice,
+  labelChipStyle,
+} from "../labels";
 
 const route = useRoute();
 
@@ -203,7 +210,7 @@ onMounted(load);
               · {{ photoCount(project) }} foto{{
                 photoCount(project) === 1 ? "" : "'s"
               }}
-              <template v-if="project.sellingPrice != null">
+              <template v-if="hasSellingPrice(project.sellingPrice)">
                 · {{ formatEuro(project.sellingPrice) }}
               </template>
               <template v-if="editMode && project.kwhUsage != null">

@@ -31,6 +31,7 @@ import {
   formatDate,
   formatKwh,
   formatEuro,
+  hasSellingPrice,
   labelChipStyle,
 } from "../labels";
 
@@ -637,13 +638,13 @@ async function purge() {
 
       <div
         v-if="
-          project.sellingPrice != null ||
+          hasSellingPrice(project.sellingPrice) ||
           (editMode &&
             (project.kwhUsage != null || project.costPrice != null))
         "
         class="stats-row"
       >
-        <div v-if="project.sellingPrice != null" class="stat">
+        <div v-if="hasSellingPrice(project.sellingPrice)" class="stat">
           <span class="stat-label">Verkoopprijs</span>
           <strong>{{ formatEuro(project.sellingPrice) }}</strong>
         </div>
