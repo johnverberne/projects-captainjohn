@@ -38,6 +38,7 @@ function storePhotoBuffer(file) {
         size: file.size,
         thumbsUp: 0,
         thumbedBy: [],
+        isCover: false,
       });
     });
 
@@ -107,9 +108,32 @@ function serializePhoto(photo, url, voterId = null) {
     size: photo.size,
     thumbsUp: photo.thumbsUp || 0,
     thumbedByMe: Boolean(voterId && thumbedBy.includes(voterId)),
+    isCover: Boolean(photo.isCover),
     fileId: photo.fileId,
     url,
   };
+}
+
+/** Zorg dat precies één projectfoto als hoofdfoto geldt (fallback: eerste). */
+function ensureProjectCover(project) {
+  const photos = project.photos || [];
+  if (!photos.length) return;
+  const covers = photos.filter((photo) => photo.isCover);
+  if (covers.length === 1) return;
+  for (const photo of photos) photo.isCover = false;
+  photos[0].isCover = true;
+}
+
+function setProjectCover(project, photoId) {
+  const photos = project.photos || [];
+  const target = photos.id
+    ? photos.id(photoId)
+    : photos.find((photo) => String(photo._id) === String(photoId));
+  if (!target) return false;
+  for (const photo of photos) {
+    photo.isCover = String(photo._id) === String(target._id);
+  }
+  return true;
 }
 
 function serializeProject(project, { voterId = null } = {}) {
@@ -165,4 +189,6 @@ module.exports = {
   migrateLegacyPhoto,
   serializePhoto,
   serializeProject,
+  ensureProjectCover,
+  setProjectCover,
 };

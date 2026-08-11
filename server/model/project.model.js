@@ -24,6 +24,7 @@ const PhotoSchema = new Schema(
     url: String,
     thumbsUp: { type: Number, default: 0, min: 0 },
     thumbedBy: { type: [String], default: [] },
+    isCover: { type: Boolean, default: false },
   },
   { _id: true }
 );

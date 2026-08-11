@@ -814,6 +814,11 @@ h2 {
   position: relative;
 }
 
+.photo-tile.cover .photo-thumb {
+  box-shadow: 0 0 0 2px var(--copper);
+  border-radius: 10px;
+}
+
 .photo-thumb {
   appearance: none;
   border: 0;
@@ -833,6 +838,67 @@ h2 {
   object-fit: cover;
   display: block;
   background: var(--paper-deep);
+}
+
+.cover-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fffdf8;
+  background: rgba(143, 64, 36, 0.92);
+  pointer-events: none;
+}
+
+.photo-delete {
+  appearance: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fffdf8;
+  background: rgba(155, 44, 44, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.photo-delete:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.cover-chip {
+  appearance: none;
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 2;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--sea);
+  background: rgba(255, 252, 246, 0.95);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.cover-chip:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .thumb-chip,
@@ -880,13 +946,52 @@ h2 {
 }
 
 .lightbox-thumb {
+  position: static;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-size: 1.05rem;
+}
+
+.lightbox-actions {
   position: absolute;
   left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  max-width: calc(100% - 24px);
+  z-index: 1001;
+}
+
+.lightbox-action {
+  appearance: none;
+  border: 0;
   border-radius: 999px;
-  padding: 12px 18px;
-  font-size: 1.05rem;
+  padding: 12px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--sea);
+  background: #f7f3eb;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.lightbox-action:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.lightbox-action-static {
+  pointer-events: none;
+  background: rgba(184, 92, 56, 0.22);
+  color: var(--copper-deep);
+}
+
+.lightbox-action-danger {
+  color: #fffdf8;
+  background: var(--danger);
 }
 
 .lightbox {

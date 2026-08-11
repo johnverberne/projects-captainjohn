@@ -145,6 +145,12 @@ const ENDPOINTS = [
         description: "Duimpje omhoog op foto (publiek)",
       },
       {
+        method: "POST",
+        path: "/api/projects/:id/photos/:photoId/cover",
+        auth: true,
+        description: "Foto als hoofdfoto markeren (projectkaart)",
+      },
+      {
         method: "DELETE",
         path: "/api/projects/:id/photos/:photoId",
         auth: true,

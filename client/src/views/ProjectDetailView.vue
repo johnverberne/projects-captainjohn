@@ -7,14 +7,17 @@ import {
   addPhotos,
   addStep,
   addStepPhotos,
+  deletePhoto,
   deleteProject,
   deleteStep,
+  deleteStepPhoto,
   getMeta,
   getProject,
   purgeProject,
   purgeStep,
   restoreProject,
   restoreStep,
+  setCoverPhoto,
   thumbPhoto,
   thumbStepPhoto,
   updateProject,
@@ -47,6 +50,7 @@ const loading = ref(true);
 const error = ref("");
 const uploading = ref(false);
 const liking = ref(false);
+const photoBusy = ref("");
 const saving = ref(false);
 const mode = ref("view"); // view | edit-project | add-step | edit-step
 const editingStepId = ref(null);
@@ -163,6 +167,50 @@ async function giveThumb(photo, event, stepId = null) {
     error.value = e.message;
   } finally {
     liking.value = false;
+  }
+}
+
+const projectPhotos = computed(() => {
+  const photos = project.value?.photos || [];
+  return [...photos].sort((a, b) => Number(Boolean(b.isCover)) - Number(Boolean(a.isCover)));
+});
+
+async function markCover(photo, event) {
+  event?.stopPropagation();
+  if (!canEdit.value || !photo?._id || photo.isCover || photoBusy.value) return;
+  photoBusy.value = `cover-${photo._id}`;
+  error.value = "";
+  try {
+    project.value = await setCoverPhoto(route.params.id, photo._id);
+    syncViewerPhoto();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    photoBusy.value = "";
+  }
+}
+
+async function removePhoto(photo, event, stepId = null) {
+  event?.stopPropagation();
+  if (!canEdit.value || !photo?._id || photoBusy.value) return;
+  if (!window.confirm("Deze foto verwijderen? Dit kan niet ongedaan worden gemaakt.")) {
+    return;
+  }
+  photoBusy.value = `delete-${photo._id}`;
+  error.value = "";
+  try {
+    project.value = stepId
+      ? await deleteStepPhoto(route.params.id, stepId, photo._id)
+      : await deletePhoto(route.params.id, photo._id);
+    if (viewerPhoto.value?._id === photo._id) {
+      closePhoto();
+    } else {
+      syncViewerPhoto();
+    }
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    photoBusy.value = "";
   }
 }
 
@@ -665,11 +713,15 @@ async function purge() {
 
       <div>
         <h2>Foto’s ({{ project.photos?.length || 0 }})</h2>
-        <div v-if="project.photos?.length" class="photo-grid" style="margin-top: 10px">
+        <p v-if="canEdit && project.photos?.length" class="muted" style="margin-top: 4px">
+          Markeer een hoofdfoto voor de projectkaart, of verwijder een foto.
+        </p>
+        <div v-if="projectPhotos.length" class="photo-grid" style="margin-top: 10px">
           <div
-            v-for="photo in project.photos"
+            v-for="photo in projectPhotos"
             :key="photo._id"
             class="photo-tile"
+            :class="{ cover: photo.isCover }"
           >
             <button
               type="button"
@@ -678,36 +730,56 @@ async function purge() {
             >
               <img :src="photo.url" :alt="photo.originalName" />
             </button>
-                <button
-                  v-if="canThumb"
-                  type="button"
-                  class="thumb-chip"
-                  :class="{ done: photo.thumbedByMe }"
-                  :disabled="liking || photo.thumbedByMe"
-                  :aria-label="
-                    photo.thumbedByMe
-                      ? `Al een duimpje gegeven, nu ${photo.thumbsUp || 0}`
-                      : `Duimpje geven, nu ${photo.thumbsUp || 0}`
-                  "
-                  @click="giveThumb(photo, $event)"
-                >
-                  <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-                    />
-                  </svg>
-                  <span>{{ photo.thumbsUp || 0 }}</span>
-                </button>
-                <span v-else class="thumb-chip thumb-chip-static">
-                  <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      fill="currentColor"
-                      d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-                    />
-                  </svg>
-                  <span>{{ photo.thumbsUp || 0 }}</span>
-                </span>
+            <span v-if="photo.isCover" class="cover-badge">Hoofdfoto</span>
+            <button
+              v-if="canEdit"
+              type="button"
+              class="photo-delete"
+              :disabled="Boolean(photoBusy)"
+              aria-label="Foto verwijderen"
+              @click="removePhoto(photo, $event)"
+            >
+              ×
+            </button>
+            <button
+              v-if="canEdit && !photo.isCover"
+              type="button"
+              class="cover-chip"
+              :disabled="Boolean(photoBusy)"
+              @click="markCover(photo, $event)"
+            >
+              {{ photoBusy === `cover-${photo._id}` ? "…" : "Als hoofdfoto" }}
+            </button>
+            <button
+              v-if="canThumb"
+              type="button"
+              class="thumb-chip"
+              :class="{ done: photo.thumbedByMe }"
+              :disabled="liking || photo.thumbedByMe"
+              :aria-label="
+                photo.thumbedByMe
+                  ? `Al een duimpje gegeven, nu ${photo.thumbsUp || 0}`
+                  : `Duimpje geven, nu ${photo.thumbsUp || 0}`
+              "
+              @click="giveThumb(photo, $event)"
+            >
+              <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                />
+              </svg>
+              <span>{{ photo.thumbsUp || 0 }}</span>
+            </button>
+            <span v-else class="thumb-chip thumb-chip-static">
+              <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                />
+              </svg>
+              <span>{{ photo.thumbsUp || 0 }}</span>
+            </span>
           </div>
         </div>
         <p v-else class="muted" style="margin-top: 8px">Nog geen foto’s.</p>
@@ -778,6 +850,16 @@ async function purge() {
                   @click="openPhoto(photo, step._id)"
                 >
                   <img :src="photo.url" :alt="photo.originalName" />
+                </button>
+                <button
+                  v-if="canEdit"
+                  type="button"
+                  class="photo-delete"
+                  :disabled="Boolean(photoBusy)"
+                  aria-label="Foto verwijderen"
+                  @click="removePhoto(photo, $event, step._id)"
+                >
+                  ×
                 </button>
                 <button
                   v-if="canThumb"
@@ -923,36 +1005,70 @@ async function purge() {
           :src="viewerPhoto.url"
           :alt="viewerPhoto.originalName"
         />
-        <button
-          v-if="canThumb"
-          type="button"
-          class="lightbox-thumb"
-          :class="{ done: viewerPhoto.thumbedByMe }"
-          :disabled="liking || viewerPhoto.thumbedByMe"
-          :aria-label="
-            viewerPhoto.thumbedByMe
-              ? `Al een duimpje gegeven, nu ${viewerPhoto.thumbsUp || 0}`
-              : `Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`
-          "
-          @click="giveThumb(viewerPhoto, $event, viewerStepId)"
-        >
-          <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-            />
-          </svg>
-          <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
-        </button>
-        <span v-else class="lightbox-thumb thumb-chip-static">
-          <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-            />
-          </svg>
-          <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
-        </span>
+        <div class="lightbox-actions">
+          <button
+            v-if="canEdit && !viewerStepId && !viewerPhoto.isCover"
+            type="button"
+            class="lightbox-action"
+            :disabled="Boolean(photoBusy)"
+            @click="markCover(viewerPhoto, $event)"
+          >
+            {{
+              photoBusy === `cover-${viewerPhoto._id}`
+                ? "Bezig…"
+                : "Als hoofdfoto"
+            }}
+          </button>
+          <span
+            v-else-if="canEdit && !viewerStepId && viewerPhoto.isCover"
+            class="lightbox-action lightbox-action-static"
+          >
+            Hoofdfoto
+          </span>
+          <button
+            v-if="canEdit"
+            type="button"
+            class="lightbox-action lightbox-action-danger"
+            :disabled="Boolean(photoBusy)"
+            @click="removePhoto(viewerPhoto, $event, viewerStepId)"
+          >
+            {{
+              photoBusy === `delete-${viewerPhoto._id}`
+                ? "Bezig…"
+                : "Verwijderen"
+            }}
+          </button>
+          <button
+            v-if="canThumb"
+            type="button"
+            class="lightbox-thumb"
+            :class="{ done: viewerPhoto.thumbedByMe }"
+            :disabled="liking || viewerPhoto.thumbedByMe"
+            :aria-label="
+              viewerPhoto.thumbedByMe
+                ? `Al een duimpje gegeven, nu ${viewerPhoto.thumbsUp || 0}`
+                : `Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`
+            "
+            @click="giveThumb(viewerPhoto, $event, viewerStepId)"
+          >
+            <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+              />
+            </svg>
+            <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
+          </button>
+          <span v-else class="lightbox-thumb thumb-chip-static">
+            <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+              />
+            </svg>
+            <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
+          </span>
+        </div>
       </div>
 
       <p v-if="error" class="error">{{ error }}</p>

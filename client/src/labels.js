@@ -69,6 +69,13 @@ export function hasSellingPrice(value) {
   return Number.isFinite(Number(value));
 }
 
+/** Hoofdfoto voor projectkaart; fallback: eerste foto. */
+export function displayPhoto(project) {
+  const photos = project?.photos || [];
+  if (!photos.length) return null;
+  return photos.find((photo) => photo.isCover) || photos[0];
+}
+
 export function labelChipStyle(color) {
   const hex = String(color || "#2a5554").replace("#", "");
   const full =
