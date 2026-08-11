@@ -52,7 +52,7 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// Zoals bdeditor /api/create-login: aanvraag zonder wachtwoord
+// Toegangsaanvraag zonder zelfgekozen wachtwoord
 router.post("/create-login", async (req, res) => {
   try {
     const email = normalizeEmail(req.body.email);

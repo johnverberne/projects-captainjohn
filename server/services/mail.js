@@ -6,7 +6,6 @@ function smtpConfigured() {
   );
 }
 
-/** Zelfde mail-setup als bdeditor/server/api/User.js sendMail */
 async function sendMail(to, subject, message) {
   if (!smtpConfigured()) {
     const err = new Error("SMTP is niet geconfigureerd");

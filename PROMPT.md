@@ -171,7 +171,7 @@ MONGO_URI, MONGO_SESSION_URI, SESSION_SECRET (leeg in example; code-default `cap
 
 ### Runtime/test (niet per se in .env.example)
 ALLOW_NO_CLIENT (tests zonder client/dist), E2E_EMAIL, E2E_PASSWORD, E2E_NAME, optioneel PLAYWRIGHT_BASE_URL.
-loadEnv mag ontbrekende mail-keys optioneel uit sibling `../bdeditor/.env` trekken.
+loadEnv laadt alleen de project-`.env` (plus ADMIN_EMAIL-default).
 
 ## npm scripts
 Root: install:all, build (scripts/build-client.js → client/dist), start, prod, dev (build+nodemon), server (nodemon), client (vite --host via prefix), dev:vite (concurrently server+client; Vite 5173 proxied `/api` + `/uploads` → 5055), test, test:unit, test:api, test:node, test:e2e, test:e2e:ui, seed:e2e.
