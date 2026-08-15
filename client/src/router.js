@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "./views/HomeView.vue";
 import NewProjectView from "./views/NewProjectView.vue";
 import ProjectDetailView from "./views/ProjectDetailView.vue";
+import SalesCornerView from "./views/SalesCornerView.vue";
 import AuthView from "./views/AuthView.vue";
 import { useAuth } from "./auth";
 
@@ -13,6 +14,12 @@ const router = createRouter({
       name: "home",
       component: HomeView,
       meta: { public: true },
+    },
+    {
+      path: "/verkoop",
+      name: "sales",
+      component: SalesCornerView,
+      meta: { public: true, allowAuthed: true },
     },
     {
       path: "/project/:id",
@@ -37,6 +44,12 @@ const router = createRouter({
       path: "/bewerken",
       name: "edit-home",
       component: HomeView,
+      meta: { requiresAuth: true, editMode: true },
+    },
+    {
+      path: "/bewerken/verkoop",
+      name: "edit-sales",
+      component: SalesCornerView,
       meta: { requiresAuth: true, editMode: true },
     },
     {
@@ -83,9 +96,12 @@ router.beforeEach(async (to) => {
   }
 
   // Ingelogd: altijd de bewerk-kant, nooit de publieke routes
-  if (auth.isLoggedIn.value && to.meta.public) {
+  if (auth.isLoggedIn.value && to.meta.public && !to.meta.allowAuthed) {
     if (to.name === "detail") {
       return { path: `/bewerken/project/${to.params.id}`, replace: true };
+    }
+    if (to.name === "sales") {
+      return { path: "/bewerken/verkoop", replace: true };
     }
     return { path: "/bewerken", replace: true };
   }

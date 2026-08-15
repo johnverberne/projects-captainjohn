@@ -7,6 +7,7 @@ const {
   PROJECT_TYPES,
   GLASFUSION_TECHNIQUES,
   GLASFUSION_SPEEDS,
+  SALE_STATUSES,
 } = require("../model/project.model");
 const {
   storePhotos,
@@ -19,6 +20,7 @@ const {
   serializeProject,
   ensureProjectCover,
   setProjectCover,
+  reorderProjectPhotos,
 } = require("../services/photoStorage");
 const { isAuthenticated } = require("../middleware/auth");
 const {
@@ -26,8 +28,10 @@ const {
   upsertCatalogLabels,
   listCatalogLabels,
 } = require("../services/labels");
+const { sendMail, smtpConfigured } = require("../services/mail");
 
 const router = express.Router();
+const adminEmail = process.env.ADMIN_EMAIL || "john.verberne@gmail.com";
 
 function isAdminUser(req) {
   const email = String(req.session?.email || "").toLowerCase();
@@ -89,6 +93,16 @@ function parseOptionalNumber(value) {
   return n;
 }
 
+function parseSaleStatus(value) {
+  if (value === undefined || value === null) return null;
+  const status = String(value).trim();
+  if (!status) return null;
+  if (!SALE_STATUSES.includes(status)) {
+    throw new Error("Ongeldige verkoopstatus");
+  }
+  return status;
+}
+
 function parseBody(body) {
   return {
     title: (body.title || "").trim(),
@@ -99,6 +113,9 @@ function parseBody(body) {
     kwhUsage: parseOptionalNumber(body.kwhUsage),
     costPrice: parseOptionalNumber(body.costPrice),
     sellingPrice: parseOptionalNumber(body.sellingPrice),
+    saleStatus: parseSaleStatus(body.saleStatus),
+    saleDescription:
+      typeof body.saleDescription === "string" ? body.saleDescription : "",
     labels: parseLabelsInput(body.labels),
   };
 }
@@ -261,6 +278,7 @@ router.get("/meta", async (_req, res) => {
       types: PROJECT_TYPES,
       glasfusionTechniques: GLASFUSION_TECHNIQUES,
       glasfusionSpeeds: GLASFUSION_SPEEDS,
+      saleStatuses: SALE_STATUSES,
       labels: catalog.map((item) => ({
         name: item.name,
         color: item.color,
@@ -370,6 +388,24 @@ router.get("/", async (req, res) => {
   }
 });
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+async function deliverOrLog(to, subject, html, logLabel) {
+  if (smtpConfigured()) {
+    return sendMail(to, subject, html);
+  }
+  console.log(`[${logLabel}] SMTP ontbreekt — mail naar ${to}`);
+  console.log(subject);
+  console.log(html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, ""));
+  return { messageId: "local-log" };
+}
+
 router.get("/:id", async (req, res) => {
   try {
     const project = await loadReadableProject(req, res, {
@@ -377,6 +413,67 @@ router.get("/:id", async (req, res) => {
     });
     if (!project) return;
     res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post("/:id/interest", async (req, res) => {
+  try {
+    const project = await loadReadableProject(req, res, { requireActive: true });
+    if (!project) return;
+
+    if (project.saleStatus !== "te_koop") {
+      return res.status(400).json({
+        error: "Interesse doorgeven kan alleen bij stukken die te koop zijn",
+      });
+    }
+
+    const name = String(req.body?.name || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const city = String(req.body?.city || "").trim();
+    const interest = String(req.body?.interest || "").trim();
+
+    if (!name) {
+      return res.status(400).json({ error: "Naam is verplicht" });
+    }
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+      return res.status(400).json({ error: "Geldig e-mailadres is verplicht" });
+    }
+    if (!city) {
+      return res.status(400).json({ error: "Woonplaats is verplicht" });
+    }
+    if (!interest) {
+      return res.status(400).json({ error: "Interesse is verplicht" });
+    }
+    if (!adminEmail) {
+      return res.status(500).json({ error: "ADMIN_EMAIL is niet geconfigureerd" });
+    }
+
+    const subject = `Interesse te koop: ${project.title}`;
+    const html = `
+      <p><strong>Nieuwe interesse via het verkoophoekje</strong></p>
+      <p>
+        <strong>Product:</strong> ${escapeHtml(project.title)}<br/>
+        <strong>Project-id:</strong> ${escapeHtml(String(project._id))}<br/>
+        <strong>Status:</strong> te koop<br/>
+        <strong>Verkoopprijs:</strong> ${
+          project.sellingPrice != null
+            ? escapeHtml(String(project.sellingPrice))
+            : "—"
+        }
+      </p>
+      <p>
+        <strong>Naam:</strong> ${escapeHtml(name)}<br/>
+        <strong>E-mail:</strong> ${escapeHtml(email)}<br/>
+        <strong>Woonplaats:</strong> ${escapeHtml(city)}<br/>
+        <strong>Interesse:</strong><br/>
+        ${escapeHtml(interest).replace(/\n/g, "<br/>")}
+      </p>
+    `;
+
+    await deliverOrLog(adminEmail, subject, html, "sale-interest");
+    res.json({ ok: true });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -420,6 +517,8 @@ router.post("/", isAuthenticated, upload.array("photos", 20), async (req, res) =
       kwhUsage: data.kwhUsage,
       costPrice: data.costPrice,
       sellingPrice: data.sellingPrice,
+      saleStatus: data.saleStatus,
+      saleDescription: data.saleDescription,
       labels,
       photos,
       steps: [],
@@ -451,6 +550,12 @@ router.put("/:id", isAuthenticated, upload.array("photos", 20), async (req, res)
     if (req.body.costPrice !== undefined) project.costPrice = data.costPrice;
     if (req.body.sellingPrice !== undefined) {
       project.sellingPrice = data.sellingPrice;
+    }
+    if (req.body.saleStatus !== undefined) {
+      project.saleStatus = data.saleStatus;
+    }
+    if (typeof req.body.saleDescription === "string") {
+      project.saleDescription = data.saleDescription;
     }
     if (data.labels !== null) {
       project.labels = data.labels;
@@ -518,6 +623,24 @@ router.post("/:id/photos/:photoId/cover", isAuthenticated, async (req, res) => {
 
     if (!setProjectCover(project, req.params.photoId)) {
       return res.status(404).json({ error: "Foto niet gevonden" });
+    }
+
+    await project.save();
+    res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.put("/:id/photos/order", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
+    if (!project) return;
+    claimOwner(project, req.session.email);
+
+    const photoIds = req.body?.photoIds;
+    if (!reorderProjectPhotos(project, photoIds)) {
+      return res.status(400).json({ error: "Ongeldige foto-volgorde" });
     }
 
     await project.save();

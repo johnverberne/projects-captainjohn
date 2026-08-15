@@ -21,8 +21,24 @@ export const SPEED_LABELS = {
   "ultra-slow": "Ultra slow",
 };
 
+export const SALE_STATUS_LABELS = {
+  showroom: "Showroom",
+  te_koop: "Te koop",
+  verkocht: "Verkocht",
+};
+
+export const SALE_STATUSES = Object.keys(SALE_STATUS_LABELS);
+
 export function typeLabel(type) {
   return TYPE_LABELS[type] || type;
+}
+
+export function saleStatusLabel(status) {
+  return SALE_STATUS_LABELS[status] || status || "";
+}
+
+export function isOnSale(project) {
+  return Boolean(project?.saleStatus && SALE_STATUS_LABELS[project.saleStatus]);
 }
 
 export function craftSubtitle(item) {

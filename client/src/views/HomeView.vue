@@ -15,6 +15,10 @@ import {
   hasSellingPrice,
   labelChipStyle,
   displayPhoto,
+  saleStatusLabel,
+  isOnSale,
+  SALE_STATUSES,
+  SALE_STATUS_LABELS,
 } from "../labels";
 
 const route = useRoute();
@@ -26,6 +30,27 @@ const featured = ref(null);
 const loading = ref(true);
 const error = ref("");
 const busyId = ref("");
+
+const SALE_ORDER = ["te_koop", "showroom", "verkocht"];
+
+const salesLink = computed(() =>
+  editMode.value ? "/bewerken/verkoop" : "/verkoop"
+);
+
+const saleSections = computed(() =>
+  SALE_ORDER.filter((status) => SALE_STATUSES.includes(status)).map(
+    (status) => ({
+      status,
+      label: SALE_STATUS_LABELS[status],
+      count: projects.value.filter((project) => project.saleStatus === status)
+        .length,
+    })
+  )
+);
+
+function salesStatusLink(status) {
+  return `${salesLink.value}?status=${status}`;
+}
 
 function photoCount(project) {
   const main = project.photos?.length || 0;
@@ -161,6 +186,28 @@ onMounted(load);
     <p v-else-if="error" class="error">{{ error }}</p>
 
     <template v-else>
+      <div class="home-sales">
+        <div class="home-sales-head">
+          <h2>Verkoophoekje</h2>
+          <router-link class="home-sales-all" :to="salesLink">
+            Alles bekijken
+          </router-link>
+        </div>
+
+        <div class="home-sales-buttons" role="navigation" aria-label="Verkoopstatus">
+          <router-link
+            v-for="section in saleSections"
+            :key="section.status"
+            class="home-sales-btn"
+            :class="`home-sales-btn-${section.status}`"
+            :to="salesStatusLink(section.status)"
+          >
+            <span class="home-sales-btn-count">{{ section.count }}</span>
+            <span class="home-sales-btn-label">{{ section.label }}</span>
+          </router-link>
+        </div>
+      </div>
+
       <div v-if="!projects.length" class="empty">
         {{
           editMode
@@ -169,61 +216,71 @@ onMounted(load);
         }}
       </div>
 
-      <div v-else class="project-list">
-        <router-link
-          v-for="project in projects"
-          :key="project._id"
-          class="project-card"
-          :to="projectLink(project)"
-        >
-          <img
-            v-if="displayPhoto(project)?.url"
-            class="thumb"
-            :src="displayPhoto(project).url"
-            :alt="project.title"
-          />
-          <div v-else class="thumb placeholder">geen foto</div>
-          <div>
-            <h2 class="meta-title">{{ project.title }}</h2>
-            <span class="badge">{{ typeLabel(project.type) }}</span>
-            <span
-              v-if="project.steps?.filter((s) => !s.deletedAt).length"
-              class="badge badge-soft"
-            >
-              +{{ project.steps.filter((s) => !s.deletedAt).length }} stap{{
-                project.steps.filter((s) => !s.deletedAt).length === 1
-                  ? ""
-                  : "pen"
-              }}
-            </span>
-            <div v-if="project.labels?.length" class="label-chip-row compact">
+      <template v-else>
+        <h2 class="home-projects-heading">Alle projecten</h2>
+        <div class="project-list">
+          <router-link
+            v-for="project in projects"
+            :key="project._id"
+            class="project-card"
+            :to="projectLink(project)"
+          >
+            <img
+              v-if="displayPhoto(project)?.url"
+              class="thumb"
+              :src="displayPhoto(project).url"
+              :alt="project.title"
+            />
+            <div v-else class="thumb placeholder">geen foto</div>
+            <div>
+              <h2 class="meta-title">{{ project.title }}</h2>
+              <span class="badge">{{ typeLabel(project.type) }}</span>
               <span
-                v-for="label in project.labels"
-                :key="label.name"
-                class="label-chip"
-                :style="labelChipStyle(label.color)"
+                v-if="isOnSale(project)"
+                class="badge"
+                :class="`sales-badge-${project.saleStatus}`"
               >
-                {{ label.name }}
+                {{ saleStatusLabel(project.saleStatus) }}
               </span>
+              <span
+                v-if="project.steps?.filter((s) => !s.deletedAt).length"
+                class="badge badge-soft"
+              >
+                +{{ project.steps.filter((s) => !s.deletedAt).length }} stap{{
+                  project.steps.filter((s) => !s.deletedAt).length === 1
+                    ? ""
+                    : "pen"
+                }}
+              </span>
+              <div v-if="project.labels?.length" class="label-chip-row compact">
+                <span
+                  v-for="label in project.labels"
+                  :key="label.name"
+                  class="label-chip"
+                  :style="labelChipStyle(label.color)"
+                >
+                  {{ label.name }}
+                </span>
+              </div>
+              <p class="muted" style="margin: 6px 0 0">
+                {{ formatDate(project.createdAt) }}
+                · {{ photoCount(project) }} foto{{
+                  photoCount(project) === 1 ? "" : "'s"
+                }}
+                <template v-if="hasSellingPrice(project.sellingPrice)">
+                  · {{ formatEuro(project.sellingPrice) }}
+                </template>
+                <template v-if="editMode && project.kwhUsage != null">
+                  · {{ formatKwh(project.kwhUsage) }}
+                </template>
+                <template v-if="editMode && project.costPrice != null">
+                  · {{ formatEuro(project.costPrice) }}
+                </template>
+              </p>
             </div>
-            <p class="muted" style="margin: 6px 0 0">
-              {{ formatDate(project.createdAt) }}
-              · {{ photoCount(project) }} foto{{
-                photoCount(project) === 1 ? "" : "'s"
-              }}
-              <template v-if="hasSellingPrice(project.sellingPrice)">
-                · {{ formatEuro(project.sellingPrice) }}
-              </template>
-              <template v-if="editMode && project.kwhUsage != null">
-                · {{ formatKwh(project.kwhUsage) }}
-              </template>
-              <template v-if="editMode && project.costPrice != null">
-                · {{ formatEuro(project.costPrice) }}
-              </template>
-            </p>
-          </div>
-        </router-link>
-      </div>
+          </router-link>
+        </div>
+      </template>
 
       <div v-if="showTrash" class="trash-section">
         <h2 class="trash-heading">Verwijderde projecten</h2>

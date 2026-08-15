@@ -13,6 +13,7 @@ const PROJECT_TYPES = [
 
 const GLASFUSION_TECHNIQUES = ["slump", "fuse", "cast"];
 const GLASFUSION_SPEEDS = ["fast", "medium", "slow", "ultra-slow"];
+const SALE_STATUSES = ["showroom", "te_koop", "verkocht"];
 
 const PhotoSchema = new Schema(
   {
@@ -101,6 +102,8 @@ const ProjectSchema = new Schema(
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
     sellingPrice: { type: Number, min: 0, default: null },
+    saleStatus: { type: String, default: null },
+    saleDescription: { type: String, default: "" },
     ownerEmail: { type: String, index: true, default: null },
     deletedAt: { type: Date, default: null, index: true },
     deletedBy: { type: String, default: null },
@@ -124,3 +127,4 @@ module.exports = mongoose.model("Project", ProjectSchema);
 module.exports.PROJECT_TYPES = PROJECT_TYPES;
 module.exports.GLASFUSION_TECHNIQUES = GLASFUSION_TECHNIQUES;
 module.exports.GLASFUSION_SPEEDS = GLASFUSION_SPEEDS;
+module.exports.SALE_STATUSES = SALE_STATUSES;

@@ -114,25 +114,55 @@ function serializePhoto(photo, url, voterId = null) {
   };
 }
 
-/** Zorg dat precies één projectfoto als hoofdfoto geldt (fallback: eerste). */
+/** Eerste projectfoto is altijd de hoofdfoto. */
 function ensureProjectCover(project) {
   const photos = project.photos || [];
   if (!photos.length) return;
-  const covers = photos.filter((photo) => photo.isCover);
-  if (covers.length === 1) return;
   for (const photo of photos) photo.isCover = false;
   photos[0].isCover = true;
 }
 
+function photoPlain(photo) {
+  return typeof photo.toObject === "function"
+    ? photo.toObject()
+    : { ...photo };
+}
+
+/** Zet foto vooraan; die wordt daarmee de hoofdfoto. */
 function setProjectCover(project, photoId) {
   const photos = project.photos || [];
-  const target = photos.id
-    ? photos.id(photoId)
-    : photos.find((photo) => String(photo._id) === String(photoId));
-  if (!target) return false;
-  for (const photo of photos) {
-    photo.isCover = String(photo._id) === String(target._id);
+  const index = photos.findIndex(
+    (photo) => String(photo._id) === String(photoId)
+  );
+  if (index < 0) return false;
+  if (index > 0) {
+    const items = photos.map(photoPlain);
+    const [photo] = items.splice(index, 1);
+    items.unshift(photo);
+    project.photos = items;
   }
+  ensureProjectCover(project);
+  return true;
+}
+
+/** Herschik projectfoto’s; eerste wordt hoofdfoto. */
+function reorderProjectPhotos(project, photoIds) {
+  const photos = project.photos || [];
+  if (!Array.isArray(photoIds) || photoIds.length !== photos.length) {
+    return false;
+  }
+  const byId = new Map(photos.map((photo) => [String(photo._id), photoPlain(photo)]));
+  const ordered = [];
+  for (const id of photoIds) {
+    const key = String(id);
+    const photo = byId.get(key);
+    if (!photo) return false;
+    ordered.push(photo);
+    byId.delete(key);
+  }
+  if (byId.size) return false;
+  project.photos = ordered;
+  ensureProjectCover(project);
   return true;
 }
 
@@ -191,4 +221,5 @@ module.exports = {
   serializeProject,
   ensureProjectCover,
   setProjectCover,
+  reorderProjectPhotos,
 };

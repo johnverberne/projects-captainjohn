@@ -98,6 +98,12 @@ const ENDPOINTS = [
         description: "Project ophalen (publiek, niet-verwijderd)",
       },
       {
+        method: "POST",
+        path: "/api/projects/:id/interest",
+        auth: false,
+        description: "Interesse doorgeven voor te-koop-product (mail naar admin)",
+      },
+      {
         method: "PUT",
         path: "/api/projects/:id",
         auth: true,
@@ -148,7 +154,13 @@ const ENDPOINTS = [
         method: "POST",
         path: "/api/projects/:id/photos/:photoId/cover",
         auth: true,
-        description: "Foto als hoofdfoto markeren (projectkaart)",
+        description: "Foto vooraan zetten als hoofdfoto (projectkaart)",
+      },
+      {
+        method: "PUT",
+        path: "/api/projects/:id/photos/order",
+        auth: true,
+        description: "Projectfoto’s herschikken (eerste = hoofdfoto)",
       },
       {
         method: "DELETE",
