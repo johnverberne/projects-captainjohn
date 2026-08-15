@@ -148,6 +148,17 @@ a {
   object-fit: contain;
 }
 
+.home-promo {
+  display: block;
+  width: min(100%, 420px);
+  margin-top: 4px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(26, 58, 58, 0.1);
+  background: #0c1211;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
 .featured-photo {
   display: block;
   width: min(100%, 420px);
