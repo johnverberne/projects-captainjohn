@@ -4,6 +4,7 @@ client/dist/
 server/uploads/*
 !server/uploads/.gitkeep
 .env
+.credentials.local.json
 .DS_Store
 *.log
 dist/
