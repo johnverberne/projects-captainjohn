@@ -152,6 +152,9 @@ Project
 ├── notes: String
 ├── kwhUsage: Number | null
 ├── costPrice: Number | null
+├── sellingPrice: Number | null
+├── saleStatus: showroom | te_koop | verkocht | null   # verkoophoekje
+├── saleDescription: String                              # tekst voor verkoophoekje
 ├── ownerEmail: String | null (index)
 ├── deletedAt: Date | null (index)   # soft-delete
 ├── deletedBy: String | null
@@ -173,7 +176,7 @@ Photo
 ├── url                     # legacy / afgeleid bij serialisatie
 ├── thumbsUp: Number
 ├── thumbedBy: [String]     # voter-id's (user:email of anon:uuid)
-├── isCover: Boolean        # hoofdfoto op projectkaart (alleen projectfoto’s)
+├── isCover: Boolean        # hoofdfoto op projectkaart (= eerste projectfoto)
 ```
 
 Maximaal één projectfoto heeft `isCover: true`. Zonder markering valt de UI terug op de eerste foto.

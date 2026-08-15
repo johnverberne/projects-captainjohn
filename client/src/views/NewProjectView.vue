@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import LabelPicker from "../components/LabelPicker.vue";
 import PhotoUploadPicker from "../components/PhotoUploadPicker.vue";
 import { createProject, getMeta } from "../api";
-import { TYPE_LABELS, TECHNIQUE_LABELS, SPEED_LABELS } from "../labels";
+import { TYPE_LABELS, TECHNIQUE_LABELS, SPEED_LABELS, SALE_STATUS_LABELS, SALE_STATUSES } from "../labels";
 
 const router = useRouter();
 
@@ -23,6 +23,8 @@ const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
 const sellingPrice = ref("");
+const saleStatus = ref("");
+const saleDescription = ref("");
 const projectLabels = ref([]);
 const files = ref([]);
 const previews = ref([]);
@@ -87,6 +89,8 @@ async function submit() {
     form.append("kwhUsage", kwhUsage.value);
     form.append("costPrice", costPrice.value);
     form.append("sellingPrice", sellingPrice.value);
+    form.append("saleStatus", saleStatus.value);
+    form.append("saleDescription", saleDescription.value);
     form.append("labels", JSON.stringify(projectLabels.value || []));
     if (isGlasfusion.value) {
       form.append("glasfusionTechnique", glasfusionTechnique.value);
@@ -228,6 +232,42 @@ async function submit() {
         min="0"
         step="0.01"
         placeholder="Bijv. 89.00"
+      />
+    </div>
+
+    <div class="field">
+      <label>Verkoophoekje</label>
+      <p class="muted" style="margin: 0 0 8px; font-size: 0.9rem">
+        De hoofdfoto (eerste foto) is de verkoopfoto.
+      </p>
+      <div class="choice-grid">
+        <button
+          type="button"
+          class="choice"
+          :class="{ active: !saleStatus }"
+          @click="saleStatus = ''"
+        >
+          Niet in hoekje
+        </button>
+        <button
+          v-for="value in SALE_STATUSES"
+          :key="value"
+          type="button"
+          class="choice"
+          :class="{ active: saleStatus === value }"
+          @click="saleStatus = value"
+        >
+          {{ SALE_STATUS_LABELS[value] }}
+        </button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="saleDescription">Verkoopomschrijving</label>
+      <textarea
+        id="saleDescription"
+        v-model="saleDescription"
+        placeholder="Korte tekst voor het verkoophoekje…"
       />
     </div>
 

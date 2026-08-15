@@ -61,12 +61,13 @@ Legenda auth: **open** = geen login, **login** = sessie verplicht.
 
 | Method | Pad | Auth | Beschrijving |
 |---|---|---|---|
-| GET | `/api/projects/meta` | open | Types, glasfusion-opties, labelcatalogus |
+| GET | `/api/projects/meta` | open | Types, glasfusion-opties, saleStatuses, labelcatalogus |
 | GET | `/api/projects/featured` | open | Foto met de meeste duimpjes (homepage) |
 | GET | `/api/projects` | open | Lijst projecten (`?deleted=1`, `?mine=1`) |
 | POST | `/api/projects` | login | Nieuw project (multipart) |
 | GET | `/api/projects/:id` | open | Project ophalen |
-| PUT | `/api/projects/:id` | login | Project bijwerken (multipart, o.a. `labels` JSON) |
+| POST | `/api/projects/:id/interest` | open | Interesse doorgeven (te koop; mail naar admin) |
+| PUT | `/api/projects/:id` | login | Project bijwerken (multipart, o.a. `labels`, `saleStatus`, `saleDescription`) |
 | DELETE | `/api/projects/:id` | login | Soft-delete (prullenbak) |
 | POST | `/api/projects/:id/restore` | login | Terugzetten |
 | DELETE | `/api/projects/:id/permanent` | login | Definitief wissen (na soft-delete) |
@@ -84,7 +85,8 @@ Query’s op `GET /api/projects`:
 | GET | `/api/projects/:id/photos/:photoId/file` | open | Foto streamen |
 | POST | `/api/projects/:id/photos` | login | Foto’s toevoegen (multipart `photos`) |
 | POST | `/api/projects/:id/photos/:photoId/thumb` | open | Duimpje (max. 1× per sessie/gebruiker) |
-| POST | `/api/projects/:id/photos/:photoId/cover` | login | Foto als hoofdfoto markeren (projectkaart) |
+| POST | `/api/projects/:id/photos/:photoId/cover` | login | Foto vooraan zetten als hoofdfoto (projectkaart) |
+| PUT | `/api/projects/:id/photos/order` | login | Projectfoto’s herschikken (`photoIds`; eerste = hoofdfoto) |
 | DELETE | `/api/projects/:id/photos/:photoId` | login | Foto verwijderen |
 
 ### Stappen

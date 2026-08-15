@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ProjectOptionFields from "../components/ProjectOptionFields.vue";
 import PhotoUploadPicker from "../components/PhotoUploadPicker.vue";
+import SaleInterestDialog from "../components/SaleInterestDialog.vue";
 import {
   addPhotos,
   addStep,
@@ -15,9 +16,9 @@ import {
   getProject,
   purgeProject,
   purgeStep,
+  reorderPhotos,
   restoreProject,
   restoreStep,
-  setCoverPhoto,
   thumbPhoto,
   thumbStepPhoto,
   updateProject,
@@ -36,6 +37,8 @@ import {
   formatEuro,
   hasSellingPrice,
   labelChipStyle,
+  saleStatusLabel,
+  isOnSale,
 } from "../labels";
 
 const route = useRoute();
@@ -52,6 +55,7 @@ const uploading = ref(false);
 const liking = ref(false);
 const photoBusy = ref("");
 const saving = ref(false);
+const interestOpen = ref(false);
 const mode = ref("view"); // view | edit-project | add-step | edit-step
 const editingStepId = ref(null);
 const viewerPhoto = ref(null);
@@ -73,6 +77,8 @@ const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
 const sellingPrice = ref("");
+const saleStatus = ref("");
+const saleDescription = ref("");
 const projectLabels = ref([]);
 const stepFiles = ref([]);
 const stepPreviews = ref([]);
@@ -125,6 +131,7 @@ const totals = computed(() => {
 });
 
 function openPhoto(photo, stepId = null) {
+  if (suppressPhotoClick.value) return;
   viewerPhoto.value = photo;
   viewerStepId.value = stepId;
 }
@@ -132,6 +139,29 @@ function openPhoto(photo, stepId = null) {
 function closePhoto() {
   viewerPhoto.value = null;
   viewerStepId.value = null;
+}
+
+const viewerPhotos = computed(() => {
+  if (!project.value) return [];
+  if (viewerStepId.value) {
+    const step = project.value.steps?.find((s) => s._id === viewerStepId.value);
+    return step?.photos || [];
+  }
+  return project.value.photos || [];
+});
+
+function selectViewerPhoto(photo) {
+  if (!photo?._id) return;
+  viewerPhoto.value = photo;
+}
+
+function stepViewerPhoto(delta) {
+  const photos = viewerPhotos.value;
+  if (photos.length < 2 || !viewerPhoto.value) return;
+  const index = photos.findIndex((p) => p._id === viewerPhoto.value._id);
+  if (index < 0) return;
+  const next = (index + delta + photos.length) % photos.length;
+  viewerPhoto.value = photos[next];
 }
 
 function findPhoto(photoId, stepId = null) {
@@ -170,21 +200,82 @@ async function giveThumb(photo, event, stepId = null) {
   }
 }
 
-const projectPhotos = computed(() => {
-  const photos = project.value?.photos || [];
-  return [...photos].sort((a, b) => Number(Boolean(b.isCover)) - Number(Boolean(a.isCover)));
-});
+const projectPhotos = computed(() => project.value?.photos || []);
 
-async function markCover(photo, event) {
-  event?.stopPropagation();
-  if (!canEdit.value || !photo?._id || photo.isCover || photoBusy.value) return;
-  photoBusy.value = `cover-${photo._id}`;
+const dragPhotoId = ref(null);
+const dragOverPhotoId = ref(null);
+const suppressPhotoClick = ref(false);
+
+function onPhotoDragStart(photo, event) {
+  if (!canEdit.value || !photo?._id || photoBusy.value) {
+    event.preventDefault();
+    return;
+  }
+  dragPhotoId.value = photo._id;
+  suppressPhotoClick.value = true;
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", String(photo._id));
+}
+
+function onPhotoDragOver(photo, event) {
+  if (!canEdit.value || !dragPhotoId.value || dragPhotoId.value === photo._id) return;
+  event.dataTransfer.dropEffect = "move";
+  dragOverPhotoId.value = photo._id;
+}
+
+function onPhotoDragLeave(photo) {
+  if (dragOverPhotoId.value === photo._id) dragOverPhotoId.value = null;
+}
+
+function onPhotoDragEnd() {
+  dragPhotoId.value = null;
+  dragOverPhotoId.value = null;
+  window.setTimeout(() => {
+    suppressPhotoClick.value = false;
+  }, 0);
+}
+
+async function onPhotoDrop(targetPhoto) {
+  const fromId = dragPhotoId.value;
+  dragOverPhotoId.value = null;
+  if (
+    !canEdit.value ||
+    !fromId ||
+    !targetPhoto?._id ||
+    fromId === targetPhoto._id ||
+    photoBusy.value
+  ) {
+    return;
+  }
+
+  const photos = [...(project.value?.photos || [])];
+  const fromIdx = photos.findIndex((p) => p._id === fromId);
+  const toIdx = photos.findIndex((p) => p._id === targetPhoto._id);
+  if (fromIdx < 0 || toIdx < 0) return;
+
+  const [moved] = photos.splice(fromIdx, 1);
+  photos.splice(toIdx, 0, moved);
+  const nextPhotos = photos.map((photo, index) => ({
+    ...photo,
+    isCover: index === 0,
+  }));
+  project.value = { ...project.value, photos: nextPhotos };
+
+  photoBusy.value = "reorder";
   error.value = "";
   try {
-    project.value = await setCoverPhoto(route.params.id, photo._id);
+    project.value = await reorderPhotos(
+      route.params.id,
+      nextPhotos.map((photo) => photo._id)
+    );
     syncViewerPhoto();
   } catch (e) {
     error.value = e.message;
+    try {
+      project.value = await getProject(route.params.id);
+    } catch {
+      /* keep optimistic order if reload fails */
+    }
   } finally {
     photoBusy.value = "";
   }
@@ -231,6 +322,8 @@ function resetForm() {
   kwhUsage.value = "";
   costPrice.value = "";
   sellingPrice.value = "";
+  saleStatus.value = "";
+  saleDescription.value = "";
   projectLabels.value = [];
   clearStepFiles();
 }
@@ -244,6 +337,8 @@ function fillForm(item) {
   kwhUsage.value = item.kwhUsage ?? "";
   costPrice.value = item.costPrice ?? "";
   sellingPrice.value = item.sellingPrice ?? "";
+  saleStatus.value = item.saleStatus || "";
+  saleDescription.value = item.saleDescription || "";
   projectLabels.value = (item.labels || []).map((label) => ({
     name: label.name,
     color: label.color,
@@ -283,9 +378,24 @@ function cancelForm() {
 }
 
 function onKeydown(event) {
-  if (event.key !== "Escape") return;
-  if (viewerPhoto.value) closePhoto();
-  else if (mode.value !== "view") cancelForm();
+  if (viewerPhoto.value) {
+    if (event.key === "Escape") {
+      closePhoto();
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      stepViewerPhoto(-1);
+      return;
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      stepViewerPhoto(1);
+      return;
+    }
+    return;
+  }
+  if (event.key === "Escape" && mode.value !== "view") cancelForm();
 }
 
 onUnmounted(() => {
@@ -314,6 +424,7 @@ function buildFormData({
   includePhotos = false,
   includeLabels = false,
   includeSellingPrice = false,
+  includeSaleFields = false,
 } = {}) {
   const form = new FormData();
   form.append("title", title.value.trim());
@@ -323,6 +434,10 @@ function buildFormData({
   form.append("costPrice", costPrice.value);
   if (includeSellingPrice) {
     form.append("sellingPrice", sellingPrice.value);
+  }
+  if (includeSaleFields) {
+    form.append("saleStatus", saleStatus.value);
+    form.append("saleDescription", saleDescription.value);
   }
   if (isGlasfusion.value) {
     form.append("glasfusionTechnique", glasfusionTechnique.value);
@@ -343,7 +458,11 @@ async function saveProjectEdit() {
   try {
     project.value = await updateProject(
       route.params.id,
-      buildFormData({ includeLabels: true, includeSellingPrice: true })
+      buildFormData({
+        includeLabels: true,
+        includeSellingPrice: true,
+        includeSaleFields: true,
+      })
     );
     meta.value = {
       ...meta.value,
@@ -572,10 +691,13 @@ async function purge() {
         v-model:kwh-usage="kwhUsage"
         v-model:cost-price="costPrice"
         v-model:selling-price="sellingPrice"
+        v-model:sale-status="saleStatus"
+        v-model:sale-description="saleDescription"
         v-model:labels="projectLabels"
         :meta="meta"
         :show-labels="true"
         :show-selling-price="true"
+        :show-sale-fields="true"
         id-prefix="edit-project"
       />
 
@@ -668,6 +790,13 @@ async function purge() {
 
       <div>
         <span class="badge">{{ typeLabel(project.type) }}</span>
+        <span
+          v-if="isOnSale(project)"
+          class="badge"
+          :class="`sales-badge-${project.saleStatus}`"
+        >
+          {{ saleStatusLabel(project.saleStatus) }}
+        </span>
         <span v-if="isDeleted" class="badge badge-deleted">Verwijderd</span>
         <h1 style="margin-top: 10px">{{ project.title }}</h1>
         <p class="lead">{{ craftSubtitle(project) }}</p>
@@ -706,6 +835,13 @@ async function purge() {
         </div>
       </div>
 
+      <div v-if="project.saleDescription?.trim()">
+        <h2>Verkoopomschrijving</h2>
+        <p class="muted" style="white-space: pre-wrap">
+          {{ project.saleDescription.trim() }}
+        </p>
+      </div>
+
       <div v-if="project.notes">
         <h2>Notities</h2>
         <p class="muted" style="white-space: pre-wrap">{{ project.notes }}</p>
@@ -714,21 +850,32 @@ async function purge() {
       <div>
         <h2>Foto’s ({{ project.photos?.length || 0 }})</h2>
         <p v-if="canEdit && project.photos?.length" class="muted" style="margin-top: 4px">
-          Markeer een hoofdfoto voor de projectkaart, of verwijder een foto.
+          Sleep foto’s om de volgorde te wijzigen. De eerste foto is de hoofdfoto
+          (en verkoopfoto).
         </p>
         <div v-if="projectPhotos.length" class="photo-grid" style="margin-top: 10px">
           <div
             v-for="photo in projectPhotos"
             :key="photo._id"
             class="photo-tile"
-            :class="{ cover: photo.isCover }"
+            :class="{
+              cover: photo.isCover,
+              dragging: dragPhotoId === photo._id,
+              'drag-over': dragOverPhotoId === photo._id,
+            }"
+            :draggable="canEdit && !photoBusy"
+            @dragstart="onPhotoDragStart(photo, $event)"
+            @dragover.prevent="onPhotoDragOver(photo, $event)"
+            @dragleave="onPhotoDragLeave(photo)"
+            @drop.prevent="onPhotoDrop(photo)"
+            @dragend="onPhotoDragEnd"
           >
             <button
               type="button"
               class="photo-thumb"
               @click="openPhoto(photo)"
             >
-              <img :src="photo.url" :alt="photo.originalName" />
+              <img :src="photo.url" :alt="photo.originalName" draggable="false" />
             </button>
             <span v-if="photo.isCover" class="cover-badge">Hoofdfoto</span>
             <button
@@ -740,15 +887,6 @@ async function purge() {
               @click="removePhoto(photo, $event)"
             >
               ×
-            </button>
-            <button
-              v-if="canEdit && !photo.isCover"
-              type="button"
-              class="cover-chip"
-              :disabled="Boolean(photoBusy)"
-              @click="markCover(photo, $event)"
-            >
-              {{ photoBusy === `cover-${photo._id}` ? "…" : "Als hoofdfoto" }}
             </button>
             <button
               v-if="canThumb"
@@ -1000,80 +1138,93 @@ async function purge() {
         <button type="button" class="lightbox-close" @click="closePhoto">
           Sluiten
         </button>
-        <img
-          class="lightbox-image"
-          :src="viewerPhoto.url"
-          :alt="viewerPhoto.originalName"
-        />
-        <div class="lightbox-actions">
-          <button
-            v-if="canEdit && !viewerStepId && !viewerPhoto.isCover"
-            type="button"
-            class="lightbox-action"
-            :disabled="Boolean(photoBusy)"
-            @click="markCover(viewerPhoto, $event)"
+        <div class="lightbox-stage">
+          <img
+            class="lightbox-image"
+            :src="viewerPhoto.url"
+            :alt="viewerPhoto.originalName"
+          />
+        </div>
+        <div class="lightbox-footer">
+          <div
+            v-if="viewerPhotos.length > 1"
+            class="lightbox-filmstrip"
+            role="list"
+            aria-label="Andere foto’s"
           >
-            {{
-              photoBusy === `cover-${viewerPhoto._id}`
-                ? "Bezig…"
-                : "Als hoofdfoto"
-            }}
-          </button>
-          <span
-            v-else-if="canEdit && !viewerStepId && viewerPhoto.isCover"
-            class="lightbox-action lightbox-action-static"
-          >
-            Hoofdfoto
-          </span>
-          <button
-            v-if="canEdit"
-            type="button"
-            class="lightbox-action lightbox-action-danger"
-            :disabled="Boolean(photoBusy)"
-            @click="removePhoto(viewerPhoto, $event, viewerStepId)"
-          >
-            {{
-              photoBusy === `delete-${viewerPhoto._id}`
-                ? "Bezig…"
-                : "Verwijderen"
-            }}
-          </button>
-          <button
-            v-if="canThumb"
-            type="button"
-            class="lightbox-thumb"
-            :class="{ done: viewerPhoto.thumbedByMe }"
-            :disabled="liking || viewerPhoto.thumbedByMe"
-            :aria-label="
-              viewerPhoto.thumbedByMe
-                ? `Al een duimpje gegeven, nu ${viewerPhoto.thumbsUp || 0}`
-                : `Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`
-            "
-            @click="giveThumb(viewerPhoto, $event, viewerStepId)"
-          >
-            <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-              />
-            </svg>
-            <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
-          </button>
-          <span v-else class="lightbox-thumb thumb-chip-static">
-            <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
-              />
-            </svg>
-            <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
-          </span>
+            <button
+              v-for="photo in viewerPhotos"
+              :key="photo._id"
+              type="button"
+              class="lightbox-filmstrip-item"
+              :class="{ active: photo._id === viewerPhoto._id }"
+              role="listitem"
+              :aria-current="photo._id === viewerPhoto._id ? 'true' : undefined"
+              :aria-label="photo.originalName || 'Foto'"
+              @click="selectViewerPhoto(photo)"
+            >
+              <img :src="photo.url" alt="" draggable="false" />
+            </button>
+          </div>
+          <div class="lightbox-actions">
+            <button
+              v-if="canEdit"
+              type="button"
+              class="lightbox-action lightbox-action-danger"
+              :disabled="Boolean(photoBusy)"
+              @click="removePhoto(viewerPhoto, $event, viewerStepId)"
+            >
+              {{
+                photoBusy === `delete-${viewerPhoto._id}`
+                  ? "Bezig…"
+                  : "Verwijderen"
+              }}
+            </button>
+            <button
+              v-if="canThumb"
+              type="button"
+              class="lightbox-thumb"
+              :class="{ done: viewerPhoto.thumbedByMe }"
+              :disabled="liking || viewerPhoto.thumbedByMe"
+              :aria-label="
+                viewerPhoto.thumbedByMe
+                  ? `Al een duimpje gegeven, nu ${viewerPhoto.thumbsUp || 0}`
+                  : `Duimpje geven, nu ${viewerPhoto.thumbsUp || 0}`
+              "
+              @click="giveThumb(viewerPhoto, $event, viewerStepId)"
+            >
+              <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                />
+              </svg>
+              <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
+            </button>
+            <span v-else class="lightbox-thumb thumb-chip-static">
+              <svg class="thumb-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M2 10.5h3.5V21H2zm19.1 1.2-1.8 7.2A2.5 2.5 0 0 1 16.9 21H8.5v-9.7l2.4-4.8A2.2 2.2 0 0 1 12.9 5h.4a1.7 1.7 0 0 1 1.7 2v3.5H19a2.1 2.1 0 0 1 2.1 2.2Z"
+                />
+              </svg>
+              <span>{{ viewerPhoto.thumbsUp || 0 }}</span>
+            </span>
+          </div>
         </div>
       </div>
 
       <p v-if="error" class="error">{{ error }}</p>
 
       <div class="actions">
+        <button
+          v-if="project.saleStatus === 'te_koop' && !isDeleted"
+          class="btn btn-primary"
+          type="button"
+          @click="interestOpen = true"
+        >
+          Interesse doorgeven
+        </button>
         <button
           v-if="canManage && isDeleted"
           class="btn btn-primary"
@@ -1110,6 +1261,13 @@ async function purge() {
           Verwijderen
         </button>
       </div>
+
+      <SaleInterestDialog
+        v-if="project"
+        :project="project"
+        :open="interestOpen"
+        @close="interestOpen = false"
+      />
     </template>
   </section>
 </template>

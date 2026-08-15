@@ -167,7 +167,7 @@ describe("API: health, auth, projects", () => {
       .expect(409);
   });
 
-  it("hoofdfoto markeren en foto verwijderen", async () => {
+  it("hoofdfoto markeren, herschikken en foto verwijderen", async () => {
     await agent
       .post("/api/auth/login")
       .send({ email: TEST_USER.email, pw: TEST_USER.password })
@@ -193,22 +193,41 @@ describe("API: health, auth, projects", () => {
           size: 10,
           isCover: false,
         },
+        {
+          filename: "c.jpg",
+          originalName: "c.jpg",
+          mimetype: "image/jpeg",
+          size: 10,
+          isCover: false,
+        },
       ],
     });
     const firstId = project.photos[0]._id;
     const secondId = project.photos[1]._id;
+    const thirdId = project.photos[2]._id;
 
     const covered = await agent
       .post(`/api/projects/${project._id}/photos/${secondId}/cover`)
       .expect(200);
-    assert.equal(covered.body.photos.find((p) => p._id === String(secondId)).isCover, true);
-    assert.equal(covered.body.photos.find((p) => p._id === String(firstId)).isCover, false);
+    assert.equal(covered.body.photos[0]._id, String(secondId));
+    assert.equal(covered.body.photos[0].isCover, true);
+    assert.equal(covered.body.photos[1]._id, String(firstId));
+    assert.equal(covered.body.photos[1].isCover, false);
+
+    const reordered = await agent
+      .put(`/api/projects/${project._id}/photos/order`)
+      .send({ photoIds: [String(thirdId), String(secondId), String(firstId)] })
+      .expect(200);
+    assert.equal(reordered.body.photos[0]._id, String(thirdId));
+    assert.equal(reordered.body.photos[0].isCover, true);
+    assert.equal(reordered.body.photos[1]._id, String(secondId));
+    assert.equal(reordered.body.photos[2]._id, String(firstId));
 
     const deleted = await agent
-      .delete(`/api/projects/${project._id}/photos/${secondId}`)
+      .delete(`/api/projects/${project._id}/photos/${thirdId}`)
       .expect(200);
-    assert.equal(deleted.body.photos.length, 1);
-    assert.equal(deleted.body.photos[0]._id, String(firstId));
+    assert.equal(deleted.body.photos.length, 2);
+    assert.equal(deleted.body.photos[0]._id, String(secondId));
     assert.equal(deleted.body.photos[0].isCover, true);
   });
 

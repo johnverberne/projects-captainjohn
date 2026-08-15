@@ -59,6 +59,14 @@ export function getProject(id) {
   return request(`/api/projects/${id}`);
 }
 
+export function sendSaleInterest(projectId, payload) {
+  return request(`/api/projects/${projectId}/interest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function createProject(formData) {
   return request("/api/projects", { method: "POST", body: formData });
 }
@@ -96,6 +104,14 @@ export function thumbPhoto(projectId, photoId) {
 export function setCoverPhoto(projectId, photoId) {
   return request(`/api/projects/${projectId}/photos/${photoId}/cover`, {
     method: "POST",
+  });
+}
+
+export function reorderPhotos(projectId, photoIds) {
+  return request(`/api/projects/${projectId}/photos/order`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ photoIds }),
   });
 }
 
