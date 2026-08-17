@@ -30,11 +30,6 @@ const featured = ref(null);
 const loading = ref(true);
 const error = ref("");
 const busyId = ref("");
-const promoEnded = ref(false);
-
-function onPromoEnded() {
-  promoEnded.value = true;
-}
 
 const SALE_ORDER = ["te_koop", "showroom", "verkocht"];
 
@@ -158,21 +153,8 @@ onMounted(load);
         }}
       </p>
 
-      <video
-        v-if="!promoEnded"
-        class="home-promo"
-        src="/promo-captainjohn.mp4"
-        autoplay
-        muted
-        playsinline
-        controls
-        preload="metadata"
-        aria-label="Promo film Captain John atelier"
-        @ended="onPromoEnded"
-      />
-
       <router-link
-        v-if="promoEnded && featured?.photo?.url"
+        v-if="featured?.photo?.url"
         class="featured-photo"
         :to="featuredLink(featured)"
       >
