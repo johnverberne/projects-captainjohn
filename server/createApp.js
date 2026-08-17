@@ -85,6 +85,10 @@ function createApp(options = {}) {
   app.use("/api/auth", authRouter);
   app.use("/api/projects", projectsRouter);
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+  app.use(
+    "/fonts",
+    express.static(path.join(__dirname, "..", "client", "src", "fonts"))
+  );
 
   if (hasClient) {
     app.use(
@@ -92,12 +96,13 @@ function createApp(options = {}) {
         rewrites: [
           { from: /^\/api\/.*$/, to: (context) => context.parsedUrl.path },
           { from: /^\/uploads\/.*$/, to: (context) => context.parsedUrl.path },
+          { from: /^\/fonts\/.*$/, to: (context) => context.parsedUrl.path },
         ],
       })
     );
     app.use(express.static(clientDist, { index: "index.html" }));
     app.get("*", (req, res) => {
-      if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      if (req.path.startsWith("/api") || req.path.startsWith("/uploads") || req.path.startsWith("/fonts")) {
         return res.status(404).json({ error: "Niet gevonden" });
       }
       res.sendFile(path.join(clientDist, "index.html"));

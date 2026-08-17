@@ -293,10 +293,28 @@ function renderApiDocsHtml({ email, groups }) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>API — Captain John</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
+    @font-face {
+      font-family: "Soleil";
+      src: url("/fonts/SoleilRegular.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Soleil";
+      src: url("/fonts/SoleilBold.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Soleil";
+      src: url("/fonts/SoleilExtraBold.woff2") format("woff2");
+      font-weight: 800;
+      font-style: normal;
+      font-display: swap;
+    }
     :root {
       --ink: #1c2422;
       --ink-soft: #3d4a46;
@@ -308,7 +326,7 @@ function renderApiDocsHtml({ email, groups }) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Source Sans 3", system-ui, sans-serif;
+      font-family: "Soleil", system-ui, sans-serif;
       color: var(--ink);
       background:
         radial-gradient(1200px 600px at 10% -10%, rgba(42, 85, 84, 0.18), transparent 55%),
@@ -331,8 +349,9 @@ function renderApiDocsHtml({ email, groups }) {
       margin-bottom: 20px;
     }
     h1 {
-      font-family: "Fraunces", Georgia, serif;
+      font-family: "Soleil", system-ui, sans-serif;
       font-size: 2rem;
+      font-weight: 800;
       margin: 0;
       color: var(--sea);
     }
@@ -354,8 +373,9 @@ function renderApiDocsHtml({ email, groups }) {
       box-shadow: 0 12px 28px rgba(26, 58, 58, 0.08);
     }
     .group h2 {
-      font-family: "Fraunces", Georgia, serif;
+      font-family: "Soleil", system-ui, sans-serif;
       font-size: 1.25rem;
+      font-weight: 800;
       margin: 0 0 12px;
     }
     .table-wrap { overflow-x: auto; }

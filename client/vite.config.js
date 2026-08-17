@@ -9,6 +9,7 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:5055",
       "/uploads": "http://localhost:5055",
+      "/fonts": "http://localhost:5055",
     },
   },
 });

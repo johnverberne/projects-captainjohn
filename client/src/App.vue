@@ -39,7 +39,7 @@ async function onExport() {
     try {
       previewWindow.document.title = "Captain John — rapport…";
       previewWindow.document.body.innerHTML =
-        '<p style="font-family: Georgia, serif; padding: 2rem; color: #1a3a3a;">Rapport wordt gemaakt…</p>';
+        '<p style="font-family: Soleil, system-ui, sans-serif; padding: 2rem; color: #1a3a3a;">Rapport wordt gemaakt…</p>';
     } catch {
       /* ignore cross-window write issues */
     }
