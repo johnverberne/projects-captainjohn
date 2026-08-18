@@ -5,7 +5,7 @@ Stack: **Vue 3** + **Express** + **MongoDB Atlas** (database `project-captainjoh
 
 Productie: [projects-captainjohn-production.up.railway.app](https://projects-captainjohn-production.up.railway.app/)
 
----
+----
 
 ## Documentatie
 
