@@ -61,13 +61,13 @@ Legenda auth: **open** = geen login, **login** = sessie verplicht.
 
 | Method | Pad | Auth | Beschrijving |
 |---|---|---|---|
-| GET | `/api/projects/meta` | open | Types, glasfusion-opties, saleStatuses, labelcatalogus |
-| GET | `/api/projects/featured` | open | Foto met de meeste duimpjes (homepage) |
+| GET | `/api/projects/meta` | open | Types, glasfusion-opties, ovens, saleStatuses, labelcatalogus |
+| GET | `/api/projects/featured` | open | Publieke foto met de meeste duimpjes (homepage) |
 | GET | `/api/projects` | open | Lijst projecten (`?deleted=1`, `?mine=1`) |
 | POST | `/api/projects` | login | Nieuw project (multipart) |
 | GET | `/api/projects/:id` | open | Project ophalen |
 | POST | `/api/projects/:id/interest` | open | Interesse doorgeven (te koop; mail naar admin) |
-| PUT | `/api/projects/:id` | login | Project bijwerken (multipart, o.a. `labels`, `saleStatus`, `saleDescription`) |
+| PUT | `/api/projects/:id` | login | Project bijwerken (multipart, o.a. `labels`, `saleStatus`, `saleTitle`, `saleDescription`, `oven`, `firingSchedule`) |
 | DELETE | `/api/projects/:id` | login | Soft-delete (prullenbak) |
 | POST | `/api/projects/:id/restore` | login | Terugzetten |
 | DELETE | `/api/projects/:id/permanent` | login | Definitief wissen (na soft-delete) |
@@ -82,10 +82,11 @@ Query’s op `GET /api/projects`:
 
 | Method | Pad | Auth | Beschrijving |
 |---|---|---|---|
-| GET | `/api/projects/:id/photos/:photoId/file` | open | Foto streamen |
+| GET | `/api/projects/:id/photos/:photoId/file` | open | Foto streamen (publiek: alleen hoofdfoto/`isPublic`) |
 | POST | `/api/projects/:id/photos` | login | Foto’s toevoegen (multipart `photos`) |
 | POST | `/api/projects/:id/photos/:photoId/thumb` | open | Duimpje (max. 1× per sessie/gebruiker) |
 | POST | `/api/projects/:id/photos/:photoId/cover` | login | Foto vooraan zetten als hoofdfoto (projectkaart) |
+| POST | `/api/projects/:id/photos/:photoId/public` | login | Foto markeren als publiek of werkfoto (`isPublic`) |
 | PUT | `/api/projects/:id/photos/order` | login | Projectfoto’s herschikken (`photoIds`; eerste = hoofdfoto) |
 | DELETE | `/api/projects/:id/photos/:photoId` | login | Foto verwijderen |
 
@@ -98,7 +99,7 @@ Query’s op `GET /api/projects`:
 | DELETE | `/api/projects/:id/steps/:stepId` | login | Soft-delete |
 | POST | `/api/projects/:id/steps/:stepId/restore` | login | Terugzetten |
 | DELETE | `/api/projects/:id/steps/:stepId/permanent` | login | Definitief wissen |
-| GET | `/api/projects/:id/steps/:stepId/photos/:photoId/file` | open | Stapfoto streamen |
+| GET | `/api/projects/:id/steps/:stepId/photos/:photoId/file` | login | Stapfoto streamen (alleen beheer) |
 | POST | `/api/projects/:id/steps/:stepId/photos` | login | Foto’s bij stap |
 | POST | `/api/projects/:id/steps/:stepId/photos/:photoId/thumb` | open | Duimpje op stapfoto |
 | DELETE | `/api/projects/:id/steps/:stepId/photos/:photoId` | login | Stapfoto verwijderen |
@@ -118,10 +119,23 @@ Content-Type: application/json
 
 ### Project (multipart)
 
-Velden o.a.: `title`, `type`, `notes`, `kwhUsage`, `costPrice`,  
-`glasfusionTechnique`, `glasfusionSpeed`,  
+Velden o.a.: `title` (projecttitel), `type`, `notes` (project notitie), `kwhUsage`, `costPrice`,  
+`glasfusionTechnique`, `glasfusionSpeed`, `oven` (code),  
+`firingSchemaId`, `firingSchedule` (JSON-segmenten),  
+`saleStatus`, `saleTitle`, `saleDescription`,  
 `labels` (JSON-string van `[{ "name", "color" }]`),  
 bestanden onder `photos`.
+
+### Stookschema’s
+
+| Method | Pad | Auth | Beschrijving |
+|---|---|---|---|
+| GET | `/api/firing-schemas` | login | Lijst opgeslagen schema’s |
+| POST | `/api/firing-schemas` | login | Nieuw schema (`name`, `segments`, optioneel `technique`, `oven`) |
+| PUT | `/api/firing-schemas/:id` | login | Schema bijwerken |
+| DELETE | `/api/firing-schemas/:id` | login | Schema verwijderen |
+
+Segment: `{ "rate": 150 | null, "targetTemp": 800, "holdMinutes": 10 }`. `rate` leeg/null = vol.
 
 ### Duimpjes
 

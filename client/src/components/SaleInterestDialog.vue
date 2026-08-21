@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from "vue";
 import { sendSaleInterest } from "../api";
-import { formatEuro, hasSellingPrice } from "../labels";
+import { displayTitle, formatEuro, hasSellingPrice } from "../labels";
 
 const props = defineProps({
   project: { type: Object, required: true },
@@ -90,7 +90,7 @@ async function submit() {
         <div>
           <h2>Interesse doorgeven</h2>
           <p class="muted" style="margin: 4px 0 0">
-            Over <strong>{{ project.title }}</strong>
+            Over <strong>{{ displayTitle(project) }}</strong>
             <template v-if="hasSellingPrice(project.sellingPrice)">
               · {{ formatEuro(project.sellingPrice) }}
             </template>

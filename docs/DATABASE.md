@@ -31,12 +31,24 @@ erDiagram
     string type
     string glasfusionTechnique
     string glasfusionSpeed
+    string oven
+    ObjectId firingSchemaId
     string notes
     number kwhUsage
     number costPrice
+    string saleTitle
     string ownerEmail FK
     date deletedAt
     string deletedBy
+    date createdAt
+    date updatedAt
+  }
+
+  FIRING_SCHEMA {
+    ObjectId _id PK
+    string name
+    string technique
+    string oven
     date createdAt
     date updatedAt
   }
@@ -71,6 +83,7 @@ erDiagram
     number thumbsUp
     string thumbedBy
     boolean isCover
+    boolean isPublic
   }
 
   LABEL {
@@ -100,6 +113,7 @@ erDiagram
   PROJECT ||--o{ PROJECT_LABEL : "labels embedded"
   PROJECT ||--o{ STEP : "steps embedded"
   PROJECT ||--o{ PHOTO : "photos embedded"
+  PROJECT }o--o| FIRING_SCHEMA : "firingSchemaId"
   STEP ||--o{ PHOTO : "photos embedded"
   PROJECT_LABEL }o--o| LABEL : "name/color catalogus"
   PHOTO }o--|| GRIDFS : "fileId"
@@ -116,6 +130,7 @@ Embedded documenten (`Step`, `Photo`, `PROJECT_LABEL`) zitten in het `projects`-
 |---|---|---|
 | `users` | `User` | Accounts (argon2-wachtwoord) |
 | `projects` | `Project` | Atelierprojecten + stappen + foto-metadata |
+| `firingschemas` | `FiringSchema` | Opgeslagen glasfusion-stookschema’s |
 | `labels` | `Label` | Gedeelde labelcatalogus (naam + kleur) |
 | `photos.files` / `photos.chunks` | GridFS | Binaire foto’s |
 | sessie-store | connect-mongo | Express-sessies |
@@ -149,12 +164,16 @@ Project
 │     glasfusion | tiffany | glas-in-lood | hout | keramiek | tassen | overige
 ├── glasfusionTechnique?: slump | fuse | cast
 ├── glasfusionSpeed?: fast | medium | slow | ultra-slow
-├── notes: String
+├── oven?: klein | groot | overige   # code; label in de UI later aanpasbaar
+├── firingSchemaId?: ObjectId
+├── firingSchedule: [{ rate, targetTemp, holdMinutes }]  # rate null = vol
+├── notes: String                                        # project notitie (beheer)
 ├── kwhUsage: Number | null
 ├── costPrice: Number | null
 ├── sellingPrice: Number | null
 ├── saleStatus: showroom | te_koop | verkocht | null   # verkoophoekje
-├── saleDescription: String                              # tekst voor verkoophoekje
+├── saleTitle: String                                    # alleen bij hoekje
+├── saleDescription: String                              # verkooptekst bij hoekje
 ├── ownerEmail: String | null (index)
 ├── deletedAt: Date | null (index)   # soft-delete
 ├── deletedBy: String | null
@@ -177,9 +196,10 @@ Photo
 ├── thumbsUp: Number
 ├── thumbedBy: [String]     # voter-id's (user:email of anon:uuid)
 ├── isCover: Boolean        # hoofdfoto op projectkaart (= eerste projectfoto)
+├── isPublic: Boolean       # extra publieke foto (naast de hoofdfoto)
 ```
 
-Maximaal één projectfoto heeft `isCover: true`. Zonder markering valt de UI terug op de eerste foto.
+Maximaal één projectfoto heeft `isCover: true`. Publiek zichtbaar: hoofdfoto + `isPublic`. Werkfoto’s en stapfoto’s blijven in beheer.
 
 ### Step (embedded)
 
@@ -187,7 +207,7 @@ Maximaal één projectfoto heeft `isCover: true`. Zonder markering valt de UI te
 Step
 ├── _id
 ├── title: String
-├── type / glasfusionTechnique / glasfusionSpeed  # zelfde enums als project
+├── type / glasfusionTechnique / glasfusionSpeed / oven / firingSchedule
 ├── notes / kwhUsage / costPrice
 ├── deletedAt / deletedBy   # soft-delete
 ├── photos: [Photo]
@@ -208,6 +228,22 @@ Label
 ```
 
 Labels op een project zijn een kopie `{ name, color }`. Bij opslaan wordt de catalogus geüpdatet (upsert op `nameKey`).
+
+---
+
+## FiringSchema (catalogus)
+
+```text
+FiringSchema
+├── name: String
+├── technique?: slump | fuse | cast
+├── oven?: klein | groot | overige
+├── segments: [{ rate, targetTemp, holdMinutes }]
+├── ownerEmail: String | null
+├── createdAt / updatedAt
+```
+
+Een project bewaart een kopie in `firingSchedule` plus optioneel `firingSchemaId` van het gekozen catalogus-item.
 
 ---
 

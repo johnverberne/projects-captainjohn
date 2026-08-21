@@ -3,9 +3,12 @@ import {
   craftSubtitle,
   formatDate,
   formatEuro,
+  formatFiringSegment,
   formatKwh,
+  ovenLabel,
   stepHeading,
   typeLabel,
+  usesFiringSchedule,
 } from "../labels";
 
 const MARGIN = 16;
@@ -273,9 +276,11 @@ async function drawProject(
     ["Bijgewerkt", formatDate(project.updatedAt) || "—"],
     ["Labels", labels || "—"],
     ["Duimpjes (totaal)", String(totalLikes)],
+    ["Oven", ovenLabel(project.oven) || "—"],
     ["Verbruik (kWh)", kwhOrDash(project.kwhUsage)],
     ["Kostprijs", moneyOrDash(project.costPrice)],
     ["Verkoopprijs", moneyOrDash(project.sellingPrice)],
+    ["Verkooptitel", textOrDash(project.saleTitle)],
   ];
 
   if (deleted) {
@@ -291,12 +296,32 @@ async function drawProject(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...SEA);
-  doc.text("Notities", MARGIN, doc.__cursorY);
+  doc.text("Project notitie", MARGIN, doc.__cursorY);
   doc.__cursorY += 5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...INK);
   writeWrapped(doc, textOrDash(project.notes), MARGIN, PAGE_WIDTH - MARGIN * 2);
+
+  if (usesFiringSchedule(project) && project.firingSchedule?.length) {
+    ensureSpace(doc, 12);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...SEA);
+    doc.text("Stookschema", MARGIN, doc.__cursorY);
+    doc.__cursorY += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...INK);
+    for (const segment of project.firingSchedule) {
+      writeWrapped(
+        doc,
+        formatFiringSegment(segment),
+        MARGIN,
+        PAGE_WIDTH - MARGIN * 2
+      );
+    }
+  }
 
   await drawPhotos(doc, project.photos || [], "Projectfoto’s");
 
@@ -381,6 +406,7 @@ async function drawStep(doc, step, index, deleted = false) {
 
   drawFieldGrid(doc, [
     ["Soort", craftSubtitle(step) || typeLabel(step.type)],
+    ["Oven", ovenLabel(step.oven) || "—"],
     ["Verbruik (kWh)", kwhOrDash(step.kwhUsage)],
     ["Kostprijs", moneyOrDash(step.costPrice)],
     ...(deleted

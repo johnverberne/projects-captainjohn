@@ -4,6 +4,8 @@ import { useRoute, useRouter } from "vue-router";
 import ProjectOptionFields from "../components/ProjectOptionFields.vue";
 import PhotoUploadPicker from "../components/PhotoUploadPicker.vue";
 import SaleInterestDialog from "../components/SaleInterestDialog.vue";
+import SalePhotoBanner from "../components/SalePhotoBanner.vue";
+import FiringScheduleChart from "../components/FiringScheduleChart.vue";
 import {
   addPhotos,
   addStep,
@@ -19,6 +21,7 @@ import {
   reorderPhotos,
   restoreProject,
   restoreStep,
+  setPhotoPublic,
   thumbPhoto,
   thumbStepPhoto,
   updateProject,
@@ -39,6 +42,12 @@ import {
   labelChipStyle,
   saleStatusLabel,
   isOnSale,
+  displayTitle,
+  publicPhotos,
+  ovenLabel,
+  formatFiringSegment,
+  usesFiringSchedule,
+  OVEN_CODES,
 } from "../labels";
 
 const route = useRoute();
@@ -66,6 +75,7 @@ const meta = ref({
   types: Object.keys(TYPE_LABELS),
   glasfusionTechniques: Object.keys(TECHNIQUE_LABELS),
   glasfusionSpeeds: Object.keys(SPEED_LABELS),
+  ovens: OVEN_CODES,
   labels: [],
 });
 
@@ -73,11 +83,15 @@ const title = ref("");
 const type = ref("");
 const glasfusionTechnique = ref("");
 const glasfusionSpeed = ref("");
+const oven = ref("");
+const firingSchemaId = ref("");
+const firingSchedule = ref([]);
 const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
 const sellingPrice = ref("");
 const saleStatus = ref("");
+const saleTitle = ref("");
 const saleDescription = ref("");
 const projectLabels = ref([]);
 const stepFiles = ref([]);
@@ -200,7 +214,15 @@ async function giveThumb(photo, event, stepId = null) {
   }
 }
 
-const projectPhotos = computed(() => project.value?.photos || []);
+const projectPhotos = computed(() => {
+  const photos = project.value?.photos || [];
+  if (editMode.value) return photos;
+  return publicPhotos(project.value);
+});
+
+const publicHeading = computed(() =>
+  editMode.value ? project.value?.title || "" : displayTitle(project.value)
+);
 
 const dragPhotoId = ref(null);
 const dragOverPhotoId = ref(null);
@@ -283,7 +305,7 @@ function canStartPhotoDrag(photo, target) {
     canEdit.value &&
     !photoBusy.value &&
     Boolean(photo?._id) &&
-    !target?.closest?.(".photo-delete, .thumb-chip")
+    !target?.closest?.(".photo-delete, .thumb-chip, .photo-public")
   );
 }
 
@@ -497,6 +519,25 @@ async function removePhoto(photo, event, stepId = null) {
   }
 }
 
+async function togglePhotoPublic(photo, event) {
+  event?.stopPropagation();
+  if (!canEdit.value || !photo?._id || photo.isCover || photoBusy.value) return;
+  photoBusy.value = `public-${photo._id}`;
+  error.value = "";
+  try {
+    project.value = await setPhotoPublic(
+      route.params.id,
+      photo._id,
+      !photo.isPublic
+    );
+    syncViewerPhoto();
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    photoBusy.value = "";
+  }
+}
+
 function clearStepFiles() {
   for (const preview of stepPreviews.value) {
     URL.revokeObjectURL(preview.url);
@@ -510,11 +551,15 @@ function resetForm() {
   type.value = "";
   glasfusionTechnique.value = "";
   glasfusionSpeed.value = "";
+  oven.value = "";
+  firingSchemaId.value = "";
+  firingSchedule.value = [];
   notes.value = "";
   kwhUsage.value = "";
   costPrice.value = "";
   sellingPrice.value = "";
   saleStatus.value = "";
+  saleTitle.value = "";
   saleDescription.value = "";
   projectLabels.value = [];
   clearStepFiles();
@@ -525,11 +570,19 @@ function fillForm(item) {
   type.value = item.type || "";
   glasfusionTechnique.value = item.glasfusionTechnique || "";
   glasfusionSpeed.value = item.glasfusionSpeed || "";
+  oven.value = item.oven || "";
+  firingSchemaId.value = item.firingSchemaId || "";
+  firingSchedule.value = (item.firingSchedule || []).map((segment) => ({
+    rate: segment.rate ?? "",
+    targetTemp: segment.targetTemp ?? "",
+    holdMinutes: segment.holdMinutes ?? "",
+  }));
   notes.value = item.notes || "";
   kwhUsage.value = item.kwhUsage ?? "";
   costPrice.value = item.costPrice ?? "";
   sellingPrice.value = item.sellingPrice ?? "";
   saleStatus.value = item.saleStatus || "";
+  saleTitle.value = item.saleTitle || "";
   saleDescription.value = item.saleDescription || "";
   projectLabels.value = (item.labels || []).map((label) => ({
     name: label.name,
@@ -606,8 +659,16 @@ function validateForm({ requireTitle }) {
     error.value = "Kies een soort.";
     return false;
   }
-  if (isGlasfusion.value && (!glasfusionTechnique.value || !glasfusionSpeed.value)) {
-    error.value = "Kies techniek (slump/fuse/cast) en type (fast…ultra slow).";
+  if (isGlasfusion.value && !glasfusionTechnique.value) {
+    error.value = "Kies een techniek.";
+    return false;
+  }
+  if (
+    isGlasfusion.value &&
+    glasfusionTechnique.value !== "custom" &&
+    !glasfusionSpeed.value
+  ) {
+    error.value = "Kies type (fast…ultra slow).";
     return false;
   }
   return true;
@@ -625,11 +686,15 @@ function buildFormData({
   form.append("notes", notes.value);
   form.append("kwhUsage", kwhUsage.value);
   form.append("costPrice", costPrice.value);
+  form.append("oven", oven.value);
+  form.append("firingSchemaId", firingSchemaId.value || "");
+  form.append("firingSchedule", JSON.stringify(firingSchedule.value || []));
   if (includeSellingPrice) {
     form.append("sellingPrice", sellingPrice.value);
   }
   if (includeSaleFields) {
     form.append("saleStatus", saleStatus.value);
+    form.append("saleTitle", saleTitle.value);
     form.append("saleDescription", saleDescription.value);
   }
   if (isGlasfusion.value) {
@@ -880,17 +945,22 @@ async function purge() {
         v-model:type="type"
         v-model:glasfusion-technique="glasfusionTechnique"
         v-model:glasfusion-speed="glasfusionSpeed"
+        v-model:oven="oven"
+        v-model:firing-schema-id="firingSchemaId"
+        v-model:firing-schedule="firingSchedule"
         v-model:notes="notes"
         v-model:kwh-usage="kwhUsage"
         v-model:cost-price="costPrice"
         v-model:selling-price="sellingPrice"
         v-model:sale-status="saleStatus"
+        v-model:sale-title="saleTitle"
         v-model:sale-description="saleDescription"
         v-model:labels="projectLabels"
         :meta="meta"
         :show-labels="true"
         :show-selling-price="true"
         :show-sale-fields="true"
+        :show-firing-schema="true"
         id-prefix="edit-project"
       />
 
@@ -919,6 +989,9 @@ async function purge() {
         v-model:type="type"
         v-model:glasfusion-technique="glasfusionTechnique"
         v-model:glasfusion-speed="glasfusionSpeed"
+        v-model:oven="oven"
+        v-model:firing-schema-id="firingSchemaId"
+        v-model:firing-schedule="firingSchedule"
         v-model:notes="notes"
         v-model:kwh-usage="kwhUsage"
         v-model:cost-price="costPrice"
@@ -926,7 +999,9 @@ async function purge() {
         id-prefix="step"
         title-label="Titel (optioneel)"
         title-placeholder="Bijv. Houten voet"
+        notes-label="Notitie (optioneel)"
         type-label-text="Soort stap"
+        :show-firing-schema="true"
       />
 
       <div v-if="mode === 'add-step'" class="field">
@@ -991,8 +1066,8 @@ async function purge() {
           {{ saleStatusLabel(project.saleStatus) }}
         </span>
         <span v-if="isDeleted" class="badge badge-deleted">Verwijderd</span>
-        <h1 style="margin-top: 10px">{{ project.title }}</h1>
-        <p class="lead">{{ craftSubtitle(project) }}</p>
+        <h1 style="margin-top: 10px">{{ publicHeading }}</h1>
+        <p v-if="editMode" class="lead">{{ craftSubtitle(project) }}</p>
         <div v-if="project.labels?.length" class="label-chip-row">
           <span
             v-for="label in project.labels"
@@ -1028,23 +1103,50 @@ async function purge() {
         </div>
       </div>
 
-      <div v-if="project.saleDescription?.trim()">
-        <h2>Verkoopomschrijving</h2>
-        <p class="muted" style="white-space: pre-wrap">
+      <div v-if="isOnSale(project) && (project.saleTitle?.trim() || project.saleDescription?.trim())">
+        <h2 v-if="editMode && project.saleTitle?.trim()">{{ project.saleTitle.trim() }}</h2>
+        <p
+          v-if="project.saleDescription?.trim()"
+          class="muted"
+          style="white-space: pre-wrap"
+        >
           {{ project.saleDescription.trim() }}
         </p>
       </div>
 
-      <div v-if="project.notes">
-        <h2>Notities</h2>
+      <div v-if="editMode && project.notes">
+        <h2>Project notitie</h2>
         <p class="muted" style="white-space: pre-wrap">{{ project.notes }}</p>
       </div>
 
+      <div
+        v-if="editMode && (project.oven || usesFiringSchedule(project))"
+        class="work-method"
+      >
+        <h2>Werkmethode</h2>
+        <p v-if="project.oven" class="muted">
+          Oven: {{ ovenLabel(project.oven) }}
+        </p>
+        <FiringScheduleChart
+          v-if="usesFiringSchedule(project) && project.firingSchedule?.length"
+          :segments="project.firingSchedule"
+        />
+        <ol
+          v-if="usesFiringSchedule(project) && project.firingSchedule?.length"
+          class="schedule-list"
+        >
+          <li v-for="(segment, index) in project.firingSchedule" :key="index">
+            {{ formatFiringSegment(segment) }}
+          </li>
+        </ol>
+      </div>
+
       <div>
-        <h2>Foto’s ({{ project.photos?.length || 0 }})</h2>
+        <h2>Foto’s ({{ projectPhotos.length }})</h2>
         <p v-if="canEdit && project.photos?.length" class="muted" style="margin-top: 4px">
           Sleep foto’s om de volgorde te wijzigen (op de telefoon: even vasthouden).
-          De eerste foto is de hoofdfoto (en verkoopfoto).
+          De eerste foto is de hoofdfoto (publiek). Markeer extra foto’s als publiek;
+          de rest blijft werkfoto.
         </p>
         <div
           v-if="projectPhotos.length"
@@ -1073,8 +1175,21 @@ async function purge() {
               @click="openPhoto(photo)"
             >
               <img :src="photo.url" :alt="photo.originalName" draggable="false" />
+              <SalePhotoBanner :status="project.saleStatus" compact />
             </button>
             <span v-if="photo.isCover" class="cover-badge">Hoofdfoto</span>
+            <span v-else-if="photo.isPublic && !canEdit" class="public-badge">Publiek</span>
+            <button
+              v-if="canEdit && !photo.isCover"
+              type="button"
+              class="photo-public"
+              :class="{ on: photo.isPublic }"
+              :disabled="Boolean(photoBusy)"
+              :aria-label="photo.isPublic ? 'Niet meer publiek' : 'Markeer als publiek'"
+              @click="togglePhotoPublic(photo, $event)"
+            >
+              {{ photo.isPublic ? "Publiek" : "Werk" }}
+            </button>
             <button
               v-if="canEdit"
               type="button"
@@ -1127,7 +1242,7 @@ async function purge() {
         @change="onMorePhotos($event)"
       />
 
-      <div class="step-section">
+      <div v-if="editMode" class="step-section">
         <div class="step-section-head">
           <h2>Extra stappen ({{ steps.length }})</h2>
           <p class="muted">
@@ -1169,6 +1284,11 @@ async function purge() {
 
           <div v-if="step.notes">
             <p class="muted" style="white-space: pre-wrap">{{ step.notes }}</p>
+          </div>
+
+          <div v-if="editMode && usesFiringSchedule(step) && step.firingSchedule?.length">
+            <h4 class="step-photos-title">Stookschema</h4>
+            <FiringScheduleChart :segments="step.firingSchedule" />
           </div>
 
           <div>
@@ -1336,11 +1456,17 @@ async function purge() {
           Sluiten
         </button>
         <div class="lightbox-stage">
-          <img
-            class="lightbox-image"
-            :src="viewerPhoto.url"
-            :alt="viewerPhoto.originalName"
-          />
+          <div class="lightbox-image-wrap">
+            <img
+              class="lightbox-image"
+              :src="viewerPhoto.url"
+              :alt="viewerPhoto.originalName"
+            />
+            <SalePhotoBanner
+              v-if="!viewerStepId"
+              :status="project.saleStatus"
+            />
+          </div>
         </div>
         <div class="lightbox-footer">
           <div

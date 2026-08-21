@@ -62,6 +62,7 @@ async function seedPublicProject() {
     type: "overige",
     notes: "Voor publieke tests",
     ownerEmail: TEST_USER.email,
+    saleStatus: "showroom",
     labels: [{ name: "Demo", color: "#b85c38" }],
     photos: [],
     steps: [],

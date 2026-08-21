@@ -39,6 +39,7 @@ function storePhotoBuffer(file) {
         thumbsUp: 0,
         thumbedBy: [],
         isCover: false,
+        isPublic: false,
       });
     });
 
@@ -109,6 +110,7 @@ function serializePhoto(photo, url, voterId = null) {
     thumbsUp: photo.thumbsUp || 0,
     thumbedByMe: Boolean(voterId && thumbedBy.includes(voterId)),
     isCover: Boolean(photo.isCover),
+    isPublic: Boolean(photo.isPublic),
     fileId: photo.fileId,
     url,
   };

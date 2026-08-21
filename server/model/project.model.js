@@ -11,9 +11,12 @@ const PROJECT_TYPES = [
   "overige",
 ];
 
-const GLASFUSION_TECHNIQUES = ["slump", "fuse", "cast"];
+const GLASFUSION_TECHNIQUES = ["slump", "fuse", "cast", "custom"];
 const GLASFUSION_SPEEDS = ["fast", "medium", "slow", "ultra-slow"];
 const SALE_STATUSES = ["showroom", "te_koop", "verkocht"];
+const OVEN_CODES = ["klein", "groot", "overige"];
+
+const { FiringSegmentSchema } = require("./firingSchema.model");
 
 const PhotoSchema = new Schema(
   {
@@ -26,6 +29,7 @@ const PhotoSchema = new Schema(
     thumbsUp: { type: Number, default: 0, min: 0 },
     thumbedBy: { type: [String], default: [] },
     isCover: { type: Boolean, default: false },
+    isPublic: { type: Boolean, default: false },
   },
   { _id: true }
 );
@@ -46,12 +50,23 @@ function applyGlasfusionValidation(doc) {
         "Techniek is verplicht bij glasfusion"
       );
     }
-    if (!doc.glasfusionSpeed) {
+    if (doc.glasfusionTechnique === "custom") {
+      doc.glasfusionSpeed = undefined;
+    } else if (!doc.glasfusionSpeed) {
       doc.invalidate("glasfusionSpeed", "Type is verplicht bij glasfusion");
+    }
+    if (doc.glasfusionTechnique !== "custom") {
+      doc.firingSchemaId = undefined;
+      doc.firingSchedule = [];
     }
   } else {
     doc.glasfusionTechnique = undefined;
     doc.glasfusionSpeed = undefined;
+    doc.firingSchemaId = undefined;
+    doc.firingSchedule = [];
+  }
+  if (doc.type !== "glasfusion" && doc.type !== "keramiek") {
+    doc.oven = undefined;
   }
 }
 
@@ -69,6 +84,14 @@ const StepSchema = new Schema(
       enum: GLASFUSION_SPEEDS,
       required: false,
     },
+    oven: {
+      type: String,
+      enum: OVEN_CODES,
+      required: false,
+      default: null,
+    },
+    firingSchemaId: { type: Schema.Types.ObjectId, required: false, default: null },
+    firingSchedule: { type: [FiringSegmentSchema], default: [] },
     notes: { type: String, default: "" },
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
@@ -98,11 +121,20 @@ const ProjectSchema = new Schema(
       enum: GLASFUSION_SPEEDS,
       required: false,
     },
+    oven: {
+      type: String,
+      enum: OVEN_CODES,
+      required: false,
+      default: null,
+    },
+    firingSchemaId: { type: Schema.Types.ObjectId, required: false, default: null },
+    firingSchedule: { type: [FiringSegmentSchema], default: [] },
     notes: { type: String, default: "" },
     kwhUsage: { type: Number, min: 0, default: null },
     costPrice: { type: Number, min: 0, default: null },
     sellingPrice: { type: Number, min: 0, default: null },
     saleStatus: { type: String, default: null },
+    saleTitle: { type: String, default: "", trim: true },
     saleDescription: { type: String, default: "" },
     ownerEmail: { type: String, index: true, default: null },
     deletedAt: { type: Date, default: null, index: true },
@@ -128,3 +160,4 @@ module.exports.PROJECT_TYPES = PROJECT_TYPES;
 module.exports.GLASFUSION_TECHNIQUES = GLASFUSION_TECHNIQUES;
 module.exports.GLASFUSION_SPEEDS = GLASFUSION_SPEEDS;
 module.exports.SALE_STATUSES = SALE_STATUSES;
+module.exports.OVEN_CODES = OVEN_CODES;

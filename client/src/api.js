@@ -43,6 +43,30 @@ export function getMeta() {
   return request("/api/projects/meta");
 }
 
+export function listFiringSchemas() {
+  return request("/api/firing-schemas");
+}
+
+export function createFiringSchema(payload) {
+  return request("/api/firing-schemas", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateFiringSchema(id, payload) {
+  return request(`/api/firing-schemas/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteFiringSchema(id) {
+  return request(`/api/firing-schemas/${id}`, { method: "DELETE" });
+}
+
 export function getFeaturedPhoto() {
   return request("/api/projects/featured");
 }
@@ -104,6 +128,14 @@ export function thumbPhoto(projectId, photoId) {
 export function setCoverPhoto(projectId, photoId) {
   return request(`/api/projects/${projectId}/photos/${photoId}/cover`, {
     method: "POST",
+  });
+}
+
+export function setPhotoPublic(projectId, photoId, isPublic) {
+  return request(`/api/projects/${projectId}/photos/${photoId}/public`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isPublic }),
   });
 }
 

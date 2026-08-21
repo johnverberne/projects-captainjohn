@@ -1,10 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import LabelPicker from "../components/LabelPicker.vue";
 import PhotoUploadPicker from "../components/PhotoUploadPicker.vue";
+import ProjectOptionFields from "../components/ProjectOptionFields.vue";
 import { createProject, getMeta } from "../api";
-import { TYPE_LABELS, TECHNIQUE_LABELS, SPEED_LABELS, SALE_STATUS_LABELS, SALE_STATUSES } from "../labels";
+import {
+  TYPE_LABELS,
+  TECHNIQUE_LABELS,
+  SPEED_LABELS,
+  OVEN_CODES,
+} from "../labels";
 
 const router = useRouter();
 
@@ -12,6 +17,7 @@ const meta = ref({
   types: Object.keys(TYPE_LABELS),
   glasfusionTechniques: Object.keys(TECHNIQUE_LABELS),
   glasfusionSpeeds: Object.keys(SPEED_LABELS),
+  ovens: OVEN_CODES,
   labels: [],
 });
 
@@ -19,11 +25,15 @@ const title = ref("");
 const type = ref("");
 const glasfusionTechnique = ref("");
 const glasfusionSpeed = ref("");
+const oven = ref("");
+const firingSchemaId = ref("");
+const firingSchedule = ref([]);
 const notes = ref("");
 const kwhUsage = ref("");
 const costPrice = ref("");
 const sellingPrice = ref("");
 const saleStatus = ref("");
+const saleTitle = ref("");
 const saleDescription = ref("");
 const projectLabels = ref([]);
 const files = ref([]);
@@ -41,14 +51,6 @@ onMounted(async () => {
   }
 });
 
-function selectType(value) {
-  type.value = value;
-  if (value !== "glasfusion") {
-    glasfusionTechnique.value = "";
-    glasfusionSpeed.value = "";
-  }
-}
-
 function onFiles(event) {
   const selected = Array.from(event.target.files || []);
   files.value = [...files.value, ...selected];
@@ -65,6 +67,12 @@ function removeFile(index) {
   previews.value.splice(index, 1);
 }
 
+function appendSchedule(form) {
+  form.append("oven", oven.value);
+  form.append("firingSchemaId", firingSchemaId.value || "");
+  form.append("firingSchedule", JSON.stringify(firingSchedule.value || []));
+}
+
 async function submit() {
   error.value = "";
   if (!title.value.trim()) {
@@ -75,8 +83,16 @@ async function submit() {
     error.value = "Kies een projectsoort.";
     return;
   }
-  if (isGlasfusion.value && (!glasfusionTechnique.value || !glasfusionSpeed.value)) {
-    error.value = "Kies techniek (slump/fuse/cast) en type (fast…ultra slow).";
+  if (isGlasfusion.value && !glasfusionTechnique.value) {
+    error.value = "Kies een techniek.";
+    return;
+  }
+  if (
+    isGlasfusion.value &&
+    glasfusionTechnique.value !== "custom" &&
+    !glasfusionSpeed.value
+  ) {
+    error.value = "Kies type (fast…ultra slow).";
     return;
   }
 
@@ -90,8 +106,10 @@ async function submit() {
     form.append("costPrice", costPrice.value);
     form.append("sellingPrice", sellingPrice.value);
     form.append("saleStatus", saleStatus.value);
+    form.append("saleTitle", saleTitle.value);
     form.append("saleDescription", saleDescription.value);
     form.append("labels", JSON.stringify(projectLabels.value || []));
+    appendSchedule(form);
     if (isGlasfusion.value) {
       form.append("glasfusionTechnique", glasfusionTechnique.value);
       form.append("glasfusionSpeed", glasfusionSpeed.value);
@@ -113,72 +131,38 @@ async function submit() {
   <section class="panel stack">
     <div>
       <h1>Nieuw project</h1>
-      <p class="lead">Titel, soort, eventueel glasfusion-opties en foto’s.</p>
+      <p class="lead">Projecttitel, notitie, soort en foto’s. Verkoopvelden alleen bij een hoekje.</p>
     </div>
 
-    <div class="field">
-      <label for="title">Titel</label>
-      <input
-        id="title"
-        v-model="title"
-        type="text"
-        placeholder="Bijv. Blauw schaaltje"
-        autocomplete="off"
-      />
-    </div>
-
-    <div class="field">
-      <label>Soort project</label>
-      <div class="choice-grid">
-        <button
-          v-for="value in meta.types"
-          :key="value"
-          type="button"
-          class="choice"
-          :class="{ active: type === value }"
-          @click="selectType(value)"
-        >
-          {{ TYPE_LABELS[value] || value }}
-        </button>
-      </div>
-    </div>
-
-    <template v-if="isGlasfusion">
-      <div class="field">
-        <label>Techniek</label>
-        <div class="choice-grid">
-          <button
-            v-for="value in meta.glasfusionTechniques"
-            :key="value"
-            type="button"
-            class="choice"
-            :class="{ active: glasfusionTechnique === value }"
-            @click="glasfusionTechnique = value"
-          >
-            {{ TECHNIQUE_LABELS[value] || value }}
-          </button>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Type (snelheid)</label>
-        <div class="choice-grid">
-          <button
-            v-for="value in meta.glasfusionSpeeds"
-            :key="value"
-            type="button"
-            class="choice"
-            :class="{ active: glasfusionSpeed === value }"
-            @click="glasfusionSpeed = value"
-          >
-            {{ SPEED_LABELS[value] || value }}
-          </button>
-        </div>
-      </div>
-    </template>
+    <ProjectOptionFields
+      v-model:title="title"
+      v-model:type="type"
+      v-model:glasfusion-technique="glasfusionTechnique"
+      v-model:glasfusion-speed="glasfusionSpeed"
+      v-model:oven="oven"
+      v-model:firing-schema-id="firingSchemaId"
+      v-model:firing-schedule="firingSchedule"
+      v-model:notes="notes"
+      v-model:kwh-usage="kwhUsage"
+      v-model:cost-price="costPrice"
+      v-model:selling-price="sellingPrice"
+      v-model:sale-status="saleStatus"
+      v-model:sale-title="saleTitle"
+      v-model:sale-description="saleDescription"
+      v-model:labels="projectLabels"
+      :meta="meta"
+      id-prefix=""
+      :show-labels="true"
+      :show-selling-price="true"
+      :show-sale-fields="true"
+      :show-firing-schema="true"
+    />
 
     <div class="field">
       <label>Foto’s</label>
+      <p class="muted" style="margin: 0 0 8px; font-size: 0.9rem">
+        De eerste foto wordt de hoofdfoto (publiek). Extra foto’s markeer je later als publiek.
+      </p>
       <PhotoUploadPicker title="Foto’s toevoegen" @change="onFiles" />
       <div v-if="previews.length" class="photo-grid" style="margin-top: 12px">
         <div v-for="(preview, index) in previews" :key="preview.url" style="position: relative">
@@ -193,89 +177,6 @@ async function submit() {
           </button>
         </div>
       </div>
-    </div>
-
-    <div class="field-row">
-      <div class="field">
-        <label for="kwhUsage">Kilowattverbruik (kWh)</label>
-        <input
-          id="kwhUsage"
-          v-model="kwhUsage"
-          type="number"
-          inputmode="decimal"
-          min="0"
-          step="0.01"
-          placeholder="Bijv. 12.5"
-        />
-      </div>
-      <div class="field">
-        <label for="costPrice">Kostprijs (€)</label>
-        <input
-          id="costPrice"
-          v-model="costPrice"
-          type="number"
-          inputmode="decimal"
-          min="0"
-          step="0.01"
-          placeholder="Bijv. 45.00"
-        />
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="sellingPrice">Verkoopprijs (€)</label>
-      <input
-        id="sellingPrice"
-        v-model="sellingPrice"
-        type="number"
-        inputmode="decimal"
-        min="0"
-        step="0.01"
-        placeholder="Bijv. 89.00"
-      />
-    </div>
-
-    <div class="field">
-      <label>Verkoophoekje</label>
-      <p class="muted" style="margin: 0 0 8px; font-size: 0.9rem">
-        De hoofdfoto (eerste foto) is de verkoopfoto.
-      </p>
-      <div class="choice-grid">
-        <button
-          type="button"
-          class="choice"
-          :class="{ active: !saleStatus }"
-          @click="saleStatus = ''"
-        >
-          Niet in hoekje
-        </button>
-        <button
-          v-for="value in SALE_STATUSES"
-          :key="value"
-          type="button"
-          class="choice"
-          :class="{ active: saleStatus === value }"
-          @click="saleStatus = value"
-        >
-          {{ SALE_STATUS_LABELS[value] }}
-        </button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="saleDescription">Verkoopomschrijving</label>
-      <textarea
-        id="saleDescription"
-        v-model="saleDescription"
-        placeholder="Korte tekst voor het verkoophoekje…"
-      />
-    </div>
-
-    <LabelPicker v-model="projectLabels" :catalog="meta.labels || []" />
-
-    <div class="field">
-      <label for="notes">Notities (optioneel)</label>
-      <textarea id="notes" v-model="notes" placeholder="Afmetingen, kleuren, klant…" />
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>

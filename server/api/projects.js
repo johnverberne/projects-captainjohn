@@ -8,7 +8,12 @@ const {
   GLASFUSION_TECHNIQUES,
   GLASFUSION_SPEEDS,
   SALE_STATUSES,
+  OVEN_CODES,
 } = require("../model/project.model");
+const {
+  parseSegments,
+  parseOptionalEnum,
+} = require("./firingSchemas");
 const {
   storePhotos,
   deletePhotoFile,
@@ -103,17 +108,32 @@ function parseSaleStatus(value) {
   return status;
 }
 
+function parseFiringSchemaId(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const id = String(value).trim();
+  return id || null;
+}
+
+function parseFiringSchedule(value) {
+  if (value === undefined || value === null || value === "") return [];
+  return parseSegments(value);
+}
+
 function parseBody(body) {
   return {
     title: (body.title || "").trim(),
     type: body.type,
     glasfusionTechnique: body.glasfusionTechnique || undefined,
     glasfusionSpeed: body.glasfusionSpeed || undefined,
+    oven: parseOptionalEnum(body.oven, OVEN_CODES, "oven"),
+    firingSchemaId: parseFiringSchemaId(body.firingSchemaId),
+    firingSchedule: parseFiringSchedule(body.firingSchedule),
     notes: body.notes || "",
     kwhUsage: parseOptionalNumber(body.kwhUsage),
     costPrice: parseOptionalNumber(body.costPrice),
     sellingPrice: parseOptionalNumber(body.sellingPrice),
     saleStatus: parseSaleStatus(body.saleStatus),
+    saleTitle: typeof body.saleTitle === "string" ? body.saleTitle.trim() : "",
     saleDescription:
       typeof body.saleDescription === "string" ? body.saleDescription : "",
     labels: parseLabelsInput(body.labels),
@@ -162,24 +182,51 @@ function applyThumb(photo, voterId) {
   return { ok: true, already: false };
 }
 
-function stripInternalCosts(obj) {
-  delete obj.kwhUsage;
-  delete obj.costPrice;
-  for (const step of obj.steps || []) {
-    delete step.kwhUsage;
-    delete step.costPrice;
-  }
+function isPubliclyVisiblePhoto(photo) {
+  return Boolean(photo?.isCover || photo?.isPublic);
+}
+
+function stripWorkFields(item) {
+  delete item.notes;
+  delete item.glasfusionTechnique;
+  delete item.glasfusionSpeed;
+  delete item.oven;
+  delete item.firingSchemaId;
+  delete item.firingSchedule;
+  delete item.kwhUsage;
+  delete item.costPrice;
+  return item;
+}
+
+function stripPublicProject(obj) {
+  stripWorkFields(obj);
+  obj.photos = (obj.photos || []).filter(isPubliclyVisiblePhoto);
+  obj.steps = [];
   return obj;
+}
+
+function isInHoekje(project) {
+  return SALE_STATUSES.includes(project?.saleStatus);
+}
+
+function canSeeInternalProject(project, req) {
+  return (
+    Boolean(req.session?.email) &&
+    canAccessProject(project, req.session.email, req)
+  );
+}
+
+function canSeePublicProject(project, req) {
+  if (!project) return false;
+  if (canSeeInternalProject(project, req)) return true;
+  if (project.deletedAt) return false;
+  return isInHoekje(project);
 }
 
 function serializeForClient(project, req) {
   const obj = serializeProject(project, { voterId: peekVoterId(req) });
-  const canSeeInternal =
-    Boolean(req.session?.email) &&
-    canAccessProject(project, req.session.email, req);
-  if (!canSeeInternal) {
-    obj.steps = (obj.steps || []).filter((step) => !step.deletedAt);
-    return stripInternalCosts(obj);
+  if (!canSeeInternalProject(project, req)) {
+    return stripPublicProject(obj);
   }
   return obj;
 }
@@ -208,6 +255,10 @@ async function loadReadableProject(
       res.status(404).json({ error: "Project niet gevonden" });
       return null;
     }
+  }
+  if (!canSeePublicProject(project, req)) {
+    res.status(404).json({ error: "Project niet gevonden" });
+    return null;
   }
   return project;
 }
@@ -266,6 +317,9 @@ function applyFields(target, data, body) {
   if (data.type) target.type = data.type;
   target.glasfusionTechnique = data.glasfusionTechnique;
   target.glasfusionSpeed = data.glasfusionSpeed;
+  if (body.oven !== undefined) target.oven = data.oven;
+  if (body.firingSchemaId !== undefined) target.firingSchemaId = data.firingSchemaId;
+  if (body.firingSchedule !== undefined) target.firingSchedule = data.firingSchedule;
   if (typeof body.notes === "string") target.notes = data.notes;
   if (body.kwhUsage !== undefined) target.kwhUsage = data.kwhUsage;
   if (body.costPrice !== undefined) target.costPrice = data.costPrice;
@@ -279,6 +333,7 @@ router.get("/meta", async (_req, res) => {
       glasfusionTechniques: GLASFUSION_TECHNIQUES,
       glasfusionSpeeds: GLASFUSION_SPEEDS,
       saleStatuses: SALE_STATUSES,
+      ovens: OVEN_CODES,
       labels: catalog.map((item) => ({
         name: item.name,
         color: item.color,
@@ -296,35 +351,22 @@ router.get("/featured", async (req, res) => {
     let best = null;
 
     for (const project of projects) {
+      if (!isInHoekje(project)) continue;
       const projectId = String(project._id);
+      const publicTitle = (project.saleTitle || "").trim() || project.title;
       for (const photo of project.photos || []) {
+        if (!isPubliclyVisiblePhoto(photo)) continue;
         const thumbsUp = photo.thumbsUp || 0;
         if (thumbsUp <= 0) continue;
         if (!best || thumbsUp > best.thumbsUp) {
           best = {
             projectId,
             stepId: null,
-            projectTitle: project.title,
+            projectTitle: publicTitle,
+            saleStatus: project.saleStatus || "",
             thumbsUp,
             photo,
           };
-        }
-      }
-      for (const step of project.steps || []) {
-        if (isStepDeleted(step)) continue;
-        const stepId = String(step._id);
-        for (const photo of step.photos || []) {
-          const thumbsUp = photo.thumbsUp || 0;
-          if (thumbsUp <= 0) continue;
-          if (!best || thumbsUp > best.thumbsUp) {
-            best = {
-              projectId,
-              stepId,
-              projectTitle: project.title,
-              thumbsUp,
-              photo,
-            };
-          }
         }
       }
     }
@@ -343,6 +385,7 @@ router.get("/featured", async (req, res) => {
       projectId: best.projectId,
       stepId: best.stepId,
       projectTitle: best.projectTitle,
+      saleStatus: best.saleStatus || "",
       photo: serializePhoto(best.photo, url, peekVoterId(req)),
     });
   } catch (error) {
@@ -382,7 +425,10 @@ router.get("/", async (req, res) => {
     const projects = await Project.find(query).sort({
       ...(showDeleted ? { deletedAt: -1 } : { createdAt: -1 }),
     });
-    res.json(projects.map((project) => serializeForClient(project, req)));
+    const visible = projects.filter((project) =>
+      canSeePublicProject(project, req)
+    );
+    res.json(visible.map((project) => serializeForClient(project, req)));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -450,11 +496,12 @@ router.post("/:id/interest", async (req, res) => {
       return res.status(500).json({ error: "ADMIN_EMAIL is niet geconfigureerd" });
     }
 
-    const subject = `Interesse te koop: ${project.title}`;
+    const productTitle = (project.saleTitle || "").trim() || project.title;
+    const subject = `Interesse te koop: ${productTitle}`;
     const html = `
       <p><strong>Nieuwe interesse via het verkoophoekje</strong></p>
       <p>
-        <strong>Product:</strong> ${escapeHtml(project.title)}<br/>
+        <strong>Product:</strong> ${escapeHtml(productTitle)}<br/>
         <strong>Project-id:</strong> ${escapeHtml(String(project._id))}<br/>
         <strong>Status:</strong> te koop<br/>
         <strong>Verkoopprijs:</strong> ${
@@ -488,6 +535,12 @@ router.get("/:id/photos/:photoId/file", async (req, res) => {
 
     const photo = project.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
+    if (
+      !canSeeInternalProject(project, req) &&
+      !isPubliclyVisiblePhoto(photo)
+    ) {
+      return res.status(404).json({ error: "Foto niet gevonden" });
+    }
 
     return sendPhotoFile(res, project, photo);
   } catch (error) {
@@ -513,11 +566,15 @@ router.post("/", isAuthenticated, upload.array("photos", 20), async (req, res) =
       type: data.type,
       glasfusionTechnique: data.glasfusionTechnique,
       glasfusionSpeed: data.glasfusionSpeed,
+      oven: data.oven,
+      firingSchemaId: data.firingSchemaId,
+      firingSchedule: data.firingSchedule,
       notes: data.notes,
       kwhUsage: data.kwhUsage,
       costPrice: data.costPrice,
       sellingPrice: data.sellingPrice,
       saleStatus: data.saleStatus,
+      saleTitle: data.saleTitle,
       saleDescription: data.saleDescription,
       labels,
       photos,
@@ -545,6 +602,13 @@ router.put("/:id", isAuthenticated, upload.array("photos", 20), async (req, res)
     if (data.type) project.type = data.type;
     project.glasfusionTechnique = data.glasfusionTechnique;
     project.glasfusionSpeed = data.glasfusionSpeed;
+    if (req.body.oven !== undefined) project.oven = data.oven;
+    if (req.body.firingSchemaId !== undefined) {
+      project.firingSchemaId = data.firingSchemaId;
+    }
+    if (req.body.firingSchedule !== undefined) {
+      project.firingSchedule = data.firingSchedule;
+    }
     if (typeof req.body.notes === "string") project.notes = data.notes;
     if (req.body.kwhUsage !== undefined) project.kwhUsage = data.kwhUsage;
     if (req.body.costPrice !== undefined) project.costPrice = data.costPrice;
@@ -553,6 +617,9 @@ router.put("/:id", isAuthenticated, upload.array("photos", 20), async (req, res)
     }
     if (req.body.saleStatus !== undefined) {
       project.saleStatus = data.saleStatus;
+    }
+    if (typeof req.body.saleTitle === "string") {
+      project.saleTitle = data.saleTitle;
     }
     if (typeof req.body.saleDescription === "string") {
       project.saleDescription = data.saleDescription;
@@ -598,6 +665,12 @@ router.post("/:id/photos/:photoId/thumb", async (req, res) => {
 
     const photo = project.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
+    if (
+      !canSeeInternalProject(project, req) &&
+      !isPubliclyVisiblePhoto(photo)
+    ) {
+      return res.status(404).json({ error: "Foto niet gevonden" });
+    }
 
     const voterId = ensureVoterId(req);
     const result = applyThumb(photo, voterId);
@@ -625,6 +698,24 @@ router.post("/:id/photos/:photoId/cover", isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: "Foto niet gevonden" });
     }
 
+    await project.save();
+    res.json(serializeForClient(project, req));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.post("/:id/photos/:photoId/public", isAuthenticated, async (req, res) => {
+  try {
+    const project = await loadAccessibleProject(req, res, { requireActive: true });
+    if (!project) return;
+    claimOwner(project, req.session.email);
+
+    const photo = project.photos.id(req.params.photoId);
+    if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
+
+    const raw = req.body?.isPublic;
+    photo.isPublic = raw === true || raw === "true" || raw === "1";
     await project.save();
     res.json(serializeForClient(project, req));
   } catch (error) {
@@ -684,7 +775,16 @@ router.post("/:id/steps", isAuthenticated, upload.array("photos", 20), async (re
 
     const photos = await storePhotos(req.files);
     project.steps.push({
-      ...data,
+      title: data.title,
+      type: data.type,
+      glasfusionTechnique: data.glasfusionTechnique,
+      glasfusionSpeed: data.glasfusionSpeed,
+      oven: data.oven,
+      firingSchemaId: data.firingSchemaId,
+      firingSchedule: data.firingSchedule,
+      notes: data.notes,
+      kwhUsage: data.kwhUsage,
+      costPrice: data.costPrice,
       photos,
     });
     await project.save();
@@ -789,6 +889,9 @@ router.get("/:id/steps/:stepId/photos/:photoId/file", async (req, res) => {
 
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
+    if (!canSeeInternalProject(project, req)) {
+      return res.status(404).json({ error: "Foto niet gevonden" });
+    }
 
     const photo = step.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });
@@ -828,6 +931,9 @@ router.post("/:id/steps/:stepId/photos/:photoId/thumb", async (req, res) => {
     const step = project.steps.id(req.params.stepId);
     if (!step) return res.status(404).json({ error: "Stap niet gevonden" });
     if (!assertActiveStep(step, res)) return;
+    if (!canSeeInternalProject(project, req)) {
+      return res.status(404).json({ error: "Foto niet gevonden" });
+    }
 
     const photo = step.photos.id(req.params.photoId);
     if (!photo) return res.status(404).json({ error: "Foto niet gevonden" });

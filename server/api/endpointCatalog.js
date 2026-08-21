@@ -71,13 +71,13 @@ const ENDPOINTS = [
         method: "GET",
         path: "/api/projects/meta",
         auth: false,
-        description: "Types, glasfusion-opties en labelcatalogus (publiek)",
+        description: "Types, glasfusion-opties, ovens, saleStatuses en labelcatalogus (publiek)",
       },
       {
         method: "GET",
         path: "/api/projects/featured",
         auth: false,
-        description: "Foto met de meeste duimpjes voor de homepage (publiek)",
+        description: "Publieke foto met de meeste duimpjes voor de homepage",
       },
       {
         method: "GET",
@@ -136,7 +136,7 @@ const ENDPOINTS = [
         method: "GET",
         path: "/api/projects/:id/photos/:photoId/file",
         auth: false,
-        description: "Foto-bestand streamen (publiek)",
+        description: "Foto-bestand streamen (publiek alleen hoofdfoto/publiek gemarkeerd)",
       },
       {
         method: "POST",
@@ -155,6 +155,12 @@ const ENDPOINTS = [
         path: "/api/projects/:id/photos/:photoId/cover",
         auth: true,
         description: "Foto vooraan zetten als hoofdfoto (projectkaart)",
+      },
+      {
+        method: "POST",
+        path: "/api/projects/:id/photos/:photoId/public",
+        auth: true,
+        description: "Foto markeren als publiek of werkfoto",
       },
       {
         method: "PUT",
@@ -207,7 +213,7 @@ const ENDPOINTS = [
         method: "GET",
         path: "/api/projects/:id/steps/:stepId/photos/:photoId/file",
         auth: false,
-        description: "Stapfoto streamen (publiek)",
+        description: "Stapfoto streamen (alleen beheer)",
       },
       {
         method: "POST",
@@ -226,6 +232,35 @@ const ENDPOINTS = [
         path: "/api/projects/:id/steps/:stepId/photos/:photoId",
         auth: true,
         description: "Stapfoto verwijderen",
+      },
+    ],
+  },
+  {
+    group: "Stookschema’s",
+    items: [
+      {
+        method: "GET",
+        path: "/api/firing-schemas",
+        auth: true,
+        description: "Lijst opgeslagen glasfusion-stookschema’s",
+      },
+      {
+        method: "POST",
+        path: "/api/firing-schemas",
+        auth: true,
+        description: "Nieuw stookschema opslaan (naam + segmenten)",
+      },
+      {
+        method: "PUT",
+        path: "/api/firing-schemas/:id",
+        auth: true,
+        description: "Stookschema bijwerken",
+      },
+      {
+        method: "DELETE",
+        path: "/api/firing-schemas/:id",
+        auth: true,
+        description: "Stookschema verwijderen",
       },
     ],
   },

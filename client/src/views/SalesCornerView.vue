@@ -3,9 +3,10 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { listProjects } from "../api";
 import SaleInterestDialog from "../components/SaleInterestDialog.vue";
+import SalePhotoBanner from "../components/SalePhotoBanner.vue";
 import {
-  craftSubtitle,
   displayPhoto,
+  displayTitle,
   formatEuro,
   hasSellingPrice,
   isOnSale,
@@ -149,10 +150,12 @@ onMounted(load);
               <img
                 v-if="displayPhoto(project)?.url"
                 :src="displayPhoto(project).url"
-                :alt="project.title"
+                :alt="displayTitle(project)"
               />
               <div v-else class="sales-card-placeholder">geen foto</div>
+              <SalePhotoBanner :status="project.saleStatus" />
               <span
+                v-if="project.saleStatus === 'showroom'"
                 class="badge sales-badge"
                 :class="`sales-badge-${project.saleStatus}`"
               >
@@ -160,10 +163,7 @@ onMounted(load);
               </span>
             </div>
             <div class="sales-card-body">
-              <h2 class="meta-title">{{ project.title }}</h2>
-              <p class="muted" style="margin: 4px 0 0">
-                {{ craftSubtitle(project) }}
-              </p>
+              <h2 class="meta-title">{{ displayTitle(project) }}</h2>
               <p
                 v-if="project.saleDescription?.trim()"
                 class="sales-description"

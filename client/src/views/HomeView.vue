@@ -7,6 +7,7 @@ import {
   purgeProject,
   restoreProject,
 } from "../api";
+import SalePhotoBanner from "../components/SalePhotoBanner.vue";
 import {
   typeLabel,
   formatDate,
@@ -15,6 +16,8 @@ import {
   hasSellingPrice,
   labelChipStyle,
   displayPhoto,
+  displayTitle,
+  publicPhotos,
   saleStatusLabel,
   isOnSale,
   SALE_STATUSES,
@@ -53,6 +56,9 @@ function salesStatusLink(status) {
 }
 
 function photoCount(project) {
+  if (!editMode.value) {
+    return publicPhotos(project).length;
+  }
   const main = project.photos?.length || 0;
   const steps = (project.steps || [])
     .filter((step) => !step.deletedAt)
@@ -66,11 +72,27 @@ function projectLink(project) {
     : `/project/${project._id}`;
 }
 
+function cardTitle(project) {
+  if (editMode.value && !isOnSale(project)) return project.title || "";
+  return displayTitle(project);
+}
+
 function featuredLink(item) {
   return editMode.value
     ? `/bewerken/project/${item.projectId}`
     : `/project/${item.projectId}`;
 }
+
+const featuredSaleStatus = computed(() => {
+  const id = featured.value?.projectId;
+  if (!id) return featured.value?.saleStatus || "";
+  const match = projects.value.find((project) => String(project._id) === String(id));
+  return match?.saleStatus || featured.value?.saleStatus || "";
+});
+
+const listedProjects = computed(() =>
+  editMode.value ? projects.value : projects.value.filter(isOnSale)
+);
 
 async function load() {
   loading.value = true;
@@ -158,11 +180,14 @@ onMounted(load);
         class="featured-photo"
         :to="featuredLink(featured)"
       >
-        <img
-          class="featured-photo-img"
-          :src="featured.photo.url"
-          :alt="featured.projectTitle"
-        />
+        <div class="featured-photo-media">
+          <img
+            class="featured-photo-img"
+            :src="featured.photo.url"
+            :alt="featured.projectTitle"
+          />
+          <SalePhotoBanner :status="featuredSaleStatus" />
+        </div>
         <div class="featured-photo-caption">
           <strong>{{ featured.projectTitle }}</strong>
           <span class="muted">
@@ -208,7 +233,7 @@ onMounted(load);
         </div>
       </div>
 
-      <div v-if="!projects.length" class="empty">
+      <div v-if="!listedProjects.length" class="empty">
         {{
           editMode
             ? "Nog geen projecten. Tik op “Nieuw project starten”."
@@ -220,20 +245,22 @@ onMounted(load);
         <h2 class="home-projects-heading">Alle projecten</h2>
         <div class="project-list">
           <router-link
-            v-for="project in projects"
+            v-for="project in listedProjects"
             :key="project._id"
             class="project-card"
             :to="projectLink(project)"
           >
-            <img
-              v-if="displayPhoto(project)?.url"
-              class="thumb"
-              :src="displayPhoto(project).url"
-              :alt="project.title"
-            />
+            <div v-if="displayPhoto(project)?.url" class="thumb-wrap">
+              <img
+                class="thumb"
+                :src="displayPhoto(project).url"
+                :alt="cardTitle(project)"
+              />
+              <SalePhotoBanner :status="project.saleStatus" compact />
+            </div>
             <div v-else class="thumb placeholder">geen foto</div>
             <div>
-              <h2 class="meta-title">{{ project.title }}</h2>
+              <h2 class="meta-title">{{ cardTitle(project) }}</h2>
               <span class="badge">{{ typeLabel(project.type) }}</span>
               <span
                 v-if="isOnSale(project)"
@@ -243,7 +270,7 @@ onMounted(load);
                 {{ saleStatusLabel(project.saleStatus) }}
               </span>
               <span
-                v-if="project.steps?.filter((s) => !s.deletedAt).length"
+                v-if="editMode && project.steps?.filter((s) => !s.deletedAt).length"
                 class="badge badge-soft"
               >
                 +{{ project.steps.filter((s) => !s.deletedAt).length }} stap{{

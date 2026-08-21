@@ -9,6 +9,7 @@ const session = require("express-session");
 const MongoStore = require("connect-mongo");
 
 const projectsRouter = require("./api/projects");
+const firingSchemasRouter = require("./api/firingSchemas");
 const authRouter = require("./api/auth");
 const apiDocsRouter = require("./api/apiDocs");
 
@@ -84,6 +85,7 @@ function createApp(options = {}) {
   app.use("/api", apiDocsRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/projects", projectsRouter);
+  app.use("/api/firing-schemas", firingSchemasRouter);
   app.use("/uploads", express.static(path.join(__dirname, "uploads")));
   app.use(
     "/fonts",
