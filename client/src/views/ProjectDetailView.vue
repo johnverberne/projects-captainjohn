@@ -19,7 +19,6 @@ import {
   reorderPhotos,
   restoreProject,
   restoreStep,
-  setCoverPhoto,
   thumbPhoto,
   thumbStepPhoto,
   updateProject,
@@ -207,33 +206,52 @@ const dragPhotoId = ref(null);
 const dragOverPhotoId = ref(null);
 const suppressPhotoClick = ref(false);
 
-function onPhotoDragStart(photo, event) {
-  if (
-    !canEdit.value ||
-    !photo?._id ||
-    photoBusy.value ||
-    event.target?.closest?.(".photo-delete, .thumb-chip, .cover-chip")
-  ) {
-    event.preventDefault();
-    return;
-  }
-  dragPhotoId.value = photo._id;
-  suppressPhotoClick.value = true;
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", String(photo._id));
+const PHOTO_DRAG_DELAY_MS = 280;
+const PHOTO_DRAG_MOVE_PX = 8;
+const PHOTO_SCROLL_CANCEL_PX = 12;
+
+let photoPointer = null;
+
+function photoFromPoint(x, y) {
+  const node = document.elementFromPoint(x, y);
+  const tile = node?.closest?.("[data-photo-id]");
+  if (!tile) return null;
+  const id = tile.getAttribute("data-photo-id");
+  return (project.value?.photos || []).find((p) => String(p._id) === id) || null;
 }
 
-function onPhotoDragOver(photo, event) {
-  if (!canEdit.value || !dragPhotoId.value || dragPhotoId.value === photo._id) {
-    return;
-  }
+function preventPhotoContextMenu(event) {
   event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
-  dragOverPhotoId.value = photo._id;
 }
 
-function onPhotoDragLeave(photo) {
-  if (dragOverPhotoId.value === photo._id) dragOverPhotoId.value = null;
+function removePhotoPointerListeners() {
+  window.removeEventListener("pointermove", onPhotoPointerMove);
+  window.removeEventListener("pointerup", onPhotoPointerUp);
+  window.removeEventListener("pointercancel", onPhotoPointerCancel);
+  window.removeEventListener("touchmove", onPhotoTouchMove);
+  window.removeEventListener("touchend", onPhotoTouchEnd);
+  window.removeEventListener("touchcancel", onPhotoTouchCancel);
+  window.removeEventListener("contextmenu", preventPhotoContextMenu, true);
+}
+
+function releasePhotoPointerCapture() {
+  if (!photoPointer?.el || photoPointer.id == null) return;
+  if (photoPointer.type === "touch") return;
+  try {
+    if (photoPointer.el.hasPointerCapture(photoPointer.id)) {
+      photoPointer.el.releasePointerCapture(photoPointer.id);
+    }
+  } catch {
+    /* already released */
+  }
+}
+
+function clearPhotoPointer({ endDrag = false } = {}) {
+  if (photoPointer?.timer) clearTimeout(photoPointer.timer);
+  releasePhotoPointerCapture();
+  removePhotoPointerListeners();
+  photoPointer = null;
+  if (endDrag) onPhotoDragEnd();
 }
 
 function onPhotoDragEnd() {
@@ -244,8 +262,172 @@ function onPhotoDragEnd() {
   }, 0);
 }
 
-async function onPhotoDrop(targetPhoto, event) {
-  event?.preventDefault();
+function beginPhotoPointerDrag() {
+  if (!photoPointer || photoPointer.dragging) return;
+  photoPointer.timer = 0;
+  photoPointer.dragging = true;
+  dragPhotoId.value = photoPointer.photo._id;
+  suppressPhotoClick.value = true;
+  if (photoPointer.type !== "touch") {
+    try {
+      photoPointer.el.setPointerCapture(photoPointer.id);
+    } catch {
+      /* capture is optional */
+    }
+  }
+  if (typeof navigator.vibrate === "function") navigator.vibrate(12);
+}
+
+function canStartPhotoDrag(photo, target) {
+  return (
+    canEdit.value &&
+    !photoBusy.value &&
+    Boolean(photo?._id) &&
+    !target?.closest?.(".photo-delete, .thumb-chip")
+  );
+}
+
+function startPhotoPointerSession({ photo, el, id, x, y, type }) {
+  clearPhotoPointer();
+  photoPointer = {
+    photo,
+    el,
+    id,
+    x,
+    y,
+    dragging: false,
+    timer: 0,
+    type,
+  };
+  window.addEventListener("contextmenu", preventPhotoContextMenu, true);
+  if (type === "touch") {
+    window.addEventListener("touchmove", onPhotoTouchMove, { passive: false });
+    window.addEventListener("touchend", onPhotoTouchEnd);
+    window.addEventListener("touchcancel", onPhotoTouchCancel);
+    photoPointer.timer = window.setTimeout(
+      beginPhotoPointerDrag,
+      PHOTO_DRAG_DELAY_MS
+    );
+    return;
+  }
+  window.addEventListener("pointermove", onPhotoPointerMove, { passive: false });
+  window.addEventListener("pointerup", onPhotoPointerUp);
+  window.addEventListener("pointercancel", onPhotoPointerCancel);
+}
+
+function finishPhotoPointer(x, y) {
+  const wasDragging = Boolean(photoPointer?.dragging);
+  const target = wasDragging ? photoFromPoint(x, y) : null;
+  releasePhotoPointerCapture();
+  if (photoPointer?.timer) clearTimeout(photoPointer.timer);
+  removePhotoPointerListeners();
+  photoPointer = null;
+  if (!wasDragging) return;
+  if (target) onPhotoDrop(target);
+  onPhotoDragEnd();
+}
+
+function updatePhotoDragOver(x, y, event) {
+  if (!photoPointer?.dragging) return;
+  event.preventDefault();
+  const over = photoFromPoint(x, y);
+  dragOverPhotoId.value =
+    over && over._id !== dragPhotoId.value ? over._id : null;
+}
+
+function onPhotoPointerDown(photo, event) {
+  if (event.pointerType === "touch") return;
+  if (!canStartPhotoDrag(photo, event.target)) return;
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  startPhotoPointerSession({
+    photo,
+    el: event.currentTarget,
+    id: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    type: event.pointerType || "mouse",
+  });
+}
+
+function onPhotoTouchStart(photo, event) {
+  if (!canStartPhotoDrag(photo, event.target)) return;
+  const touch = event.changedTouches[0];
+  if (!touch) return;
+  startPhotoPointerSession({
+    photo,
+    el: event.currentTarget,
+    id: touch.identifier,
+    x: touch.clientX,
+    y: touch.clientY,
+    type: "touch",
+  });
+}
+
+function onPhotoPointerMove(event) {
+  if (!photoPointer || event.pointerId !== photoPointer.id) return;
+  const dist = Math.hypot(
+    event.clientX - photoPointer.x,
+    event.clientY - photoPointer.y
+  );
+  if (!photoPointer.dragging) {
+    if (dist >= PHOTO_DRAG_MOVE_PX) beginPhotoPointerDrag();
+    return;
+  }
+  updatePhotoDragOver(event.clientX, event.clientY, event);
+}
+
+function onPhotoPointerUp(event) {
+  if (!photoPointer || event.pointerId !== photoPointer.id) return;
+  finishPhotoPointer(event.clientX, event.clientY);
+}
+
+function onPhotoPointerCancel(event) {
+  if (!photoPointer || event.pointerId !== photoPointer.id) return;
+  clearPhotoPointer({ endDrag: photoPointer.dragging });
+}
+
+function touchFromEvent(event) {
+  if (!photoPointer) return null;
+  const changed = Array.from(event.changedTouches || []);
+  const active = Array.from(event.touches || []);
+  return (
+    changed.find((touch) => touch.identifier === photoPointer.id) ||
+    active.find((touch) => touch.identifier === photoPointer.id) ||
+    null
+  );
+}
+
+function onPhotoTouchMove(event) {
+  const touch = touchFromEvent(event);
+  if (!touch) return;
+  const dist = Math.hypot(touch.clientX - photoPointer.x, touch.clientY - photoPointer.y);
+  if (!photoPointer.dragging) {
+    if (dist >= PHOTO_SCROLL_CANCEL_PX) clearPhotoPointer();
+    return;
+  }
+  updatePhotoDragOver(touch.clientX, touch.clientY, event);
+}
+
+function onPhotoTouchEnd(event) {
+  const touch = touchFromEvent(event);
+  if (!touch) return;
+  finishPhotoPointer(touch.clientX, touch.clientY);
+}
+
+function onPhotoTouchCancel(event) {
+  if (!photoPointer || photoPointer.type !== "touch") return;
+  const cancelled = Array.from(event.changedTouches || []).some(
+    (touch) => touch.identifier === photoPointer.id
+  );
+  if (!cancelled) return;
+  clearPhotoPointer({ endDrag: photoPointer.dragging });
+}
+
+function onPhotoContextMenu(event) {
+  if (canEdit.value) event.preventDefault();
+}
+
+async function onPhotoDrop(targetPhoto) {
   const fromId = dragPhotoId.value;
   dragOverPhotoId.value = null;
   if (
@@ -286,21 +468,6 @@ async function onPhotoDrop(targetPhoto, event) {
     } catch {
       /* keep optimistic order if reload fails */
     }
-  } finally {
-    photoBusy.value = "";
-  }
-}
-
-async function markCover(photo, event) {
-  event?.stopPropagation();
-  if (!canEdit.value || !photo?._id || photo.isCover || photoBusy.value) return;
-  photoBusy.value = `cover-${photo._id}`;
-  error.value = "";
-  try {
-    project.value = await setCoverPhoto(route.params.id, photo._id);
-    syncViewerPhoto();
-  } catch (e) {
-    error.value = e.message;
   } finally {
     photoBusy.value = "";
   }
@@ -425,6 +592,7 @@ function onKeydown(event) {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
+  clearPhotoPointer();
   clearStepFiles();
 });
 
@@ -875,8 +1043,8 @@ async function purge() {
       <div>
         <h2>Foto’s ({{ project.photos?.length || 0 }})</h2>
         <p v-if="canEdit && project.photos?.length" class="muted" style="margin-top: 4px">
-          Sleep foto’s om de volgorde te wijzigen. De eerste foto is de hoofdfoto (en verkoopfoto).
-          Op de telefoon: tik op ‘Als hoofdfoto’.
+          Sleep foto’s om de volgorde te wijzigen (op de telefoon: even vasthouden).
+          De eerste foto is de hoofdfoto (en verkoopfoto).
         </p>
         <div
           v-if="projectPhotos.length"
@@ -894,12 +1062,10 @@ async function purge() {
               'drag-over': dragOverPhotoId === photo._id,
               sortable: canEdit && !photoBusy,
             }"
-            :draggable="canEdit && !photoBusy"
-            @dragstart="onPhotoDragStart(photo, $event)"
-            @dragover="onPhotoDragOver(photo, $event)"
-            @dragleave="onPhotoDragLeave(photo)"
-            @drop="onPhotoDrop(photo, $event)"
-            @dragend="onPhotoDragEnd"
+            :data-photo-id="photo._id"
+            @pointerdown="onPhotoPointerDown(photo, $event)"
+            @touchstart="onPhotoTouchStart(photo, $event)"
+            @contextmenu="onPhotoContextMenu($event)"
           >
             <button
               type="button"
@@ -909,17 +1075,6 @@ async function purge() {
               <img :src="photo.url" :alt="photo.originalName" draggable="false" />
             </button>
             <span v-if="photo.isCover" class="cover-badge">Hoofdfoto</span>
-            <button
-              v-if="canEdit && !photo.isCover"
-              type="button"
-              class="cover-chip"
-              :disabled="Boolean(photoBusy)"
-              @click="markCover(photo, $event)"
-            >
-              {{
-                photoBusy === `cover-${photo._id}` ? "Bezig…" : "Als hoofdfoto"
-              }}
-            </button>
             <button
               v-if="canEdit"
               type="button"
@@ -1209,25 +1364,6 @@ async function purge() {
             </button>
           </div>
           <div class="lightbox-actions">
-            <button
-              v-if="canEdit && !viewerStepId && !viewerPhoto.isCover"
-              type="button"
-              class="lightbox-action"
-              :disabled="Boolean(photoBusy)"
-              @click="markCover(viewerPhoto, $event)"
-            >
-              {{
-                photoBusy === `cover-${viewerPhoto._id}`
-                  ? "Bezig…"
-                  : "Als hoofdfoto"
-              }}
-            </button>
-            <span
-              v-else-if="canEdit && !viewerStepId && viewerPhoto.isCover"
-              class="lightbox-action lightbox-action-static"
-            >
-              Hoofdfoto
-            </span>
             <button
               v-if="canEdit"
               type="button"
