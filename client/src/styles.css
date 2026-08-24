@@ -1642,3 +1642,259 @@ h2 {
 .work-method {
   margin-top: 4px;
 }
+
+html.slideshow-open,
+html.slideshow-open body {
+  overflow: hidden;
+}
+
+.slideshow {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #0c1211;
+  color: #fffdf8;
+  overflow: hidden;
+}
+
+.slideshow-close {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 3;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 700;
+  background: #f7f3eb;
+  color: var(--sea);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.slideshow-message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: #f7f3eb;
+  font-weight: 600;
+}
+
+.slideshow-stage {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: #0c1211;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.slideshow-photo {
+  position: absolute;
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  object-fit: cover;
+  transform-origin: center;
+}
+
+.slideshow-photo.is-zoom-in {
+  animation: slideshow-zoom-in 8s ease-out forwards;
+}
+
+.slideshow-photo.is-zoom-out {
+  animation: slideshow-zoom-out 8s ease-out forwards;
+}
+
+.slideshow-photo.is-pan-left {
+  animation: slideshow-pan-left 8s ease-out forwards;
+}
+
+.slideshow-photo.is-pan-right {
+  animation: slideshow-pan-right 8s ease-out forwards;
+}
+
+.slideshow-scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(48%, 360px);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(12, 18, 17, 0.55) 42%,
+    rgba(12, 18, 17, 0.92) 100%
+  );
+  pointer-events: none;
+}
+
+.slideshow-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 28px 22px calc(28px + env(safe-area-inset-bottom));
+  text-align: left;
+  pointer-events: none;
+}
+
+.slideshow-status {
+  margin: 0;
+  color: #fffdf8;
+  animation: slideshow-fly-right 0.75s 0.08s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slideshow-status.sales-badge-showroom {
+  color: #fffdf8;
+  background: rgba(42, 85, 84, 0.92);
+}
+
+.slideshow-status.sales-badge-te_koop {
+  color: #fffdf8;
+  background: var(--ok);
+}
+
+.slideshow-status.sales-badge-verkocht {
+  color: #fffdf8;
+  background: rgba(61, 74, 70, 0.92);
+}
+
+.slideshow-title {
+  margin: 0;
+  max-width: 18ch;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 8vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  animation: slideshow-fly-left 0.8s 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slideshow-description {
+  margin: 0;
+  max-width: 36ch;
+  font-size: 1.05rem;
+  line-height: 1.45;
+  color: rgba(247, 243, 235, 0.9);
+  animation: slideshow-fly-up 0.8s 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideshow-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  12% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+}
+
+@keyframes slideshow-zoom-out {
+  from {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+  12% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes slideshow-pan-left {
+  from {
+    opacity: 0;
+    transform: scale(1.12) translateX(3%);
+  }
+  12% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.12) translateX(-3%);
+  }
+}
+
+@keyframes slideshow-pan-right {
+  from {
+    opacity: 0;
+    transform: scale(1.12) translateX(-3%);
+  }
+  12% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.12) translateX(3%);
+  }
+}
+
+@keyframes slideshow-fly-left {
+  from {
+    opacity: 0;
+    transform: translateX(-56px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slideshow-fly-right {
+  from {
+    opacity: 0;
+    transform: translateX(56px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slideshow-fly-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slideshow-photo,
+  .slideshow-status,
+  .slideshow-title,
+  .slideshow-description {
+    animation: slideshow-fade 0.4s ease both;
+  }
+}
+
+@keyframes slideshow-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

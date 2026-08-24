@@ -7,6 +7,7 @@ import {
   purgeProject,
   restoreProject,
 } from "../api";
+import PhotoSlideshow from "../components/PhotoSlideshow.vue";
 import SalePhotoBanner from "../components/SalePhotoBanner.vue";
 import {
   typeLabel,
@@ -33,6 +34,7 @@ const featured = ref(null);
 const loading = ref(true);
 const error = ref("");
 const busyId = ref("");
+const showSlideshow = ref(false);
 
 const SALE_ORDER = ["te_koop", "showroom", "verkocht"];
 
@@ -174,6 +176,14 @@ onMounted(load);
             : "Bekijk de atelierprojecten van Captain John."
         }}
       </p>
+
+      <button
+        type="button"
+        class="btn btn-secondary btn-block"
+        @click="showSlideshow = true"
+      >
+        Slideshow starten
+      </button>
 
       <router-link
         v-if="featured?.photo?.url"
@@ -368,5 +378,7 @@ onMounted(load);
         </div>
       </div>
     </template>
+
+    <PhotoSlideshow v-if="showSlideshow" @close="showSlideshow = false" />
   </section>
 </template>
