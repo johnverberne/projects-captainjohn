@@ -38,11 +38,28 @@ async function migrateLegacyPhotos() {
   }
 }
 
+function mongoClusterName(uri) {
+  if (!uri) return "unknown";
+  try {
+    const hostname = new URL(uri).hostname;
+    if (!hostname) return "unknown";
+    if (hostname.endsWith(".mongodb.net")) {
+      return hostname.split(".")[0];
+    }
+    return hostname;
+  } catch {
+    return "unknown";
+  }
+}
+
 async function connect() {
   try {
     await mongoose.connect(mongoUri);
     mongoose.set("debug", { shell: isDev });
-    console.log("Successful connection to MongoDB (project-captainjohn)");
+    const cluster = mongoClusterName(mongoUri);
+    console.log(
+      `Successful connection to MongoDB cluster ${cluster} (project-captainjohn)`
+    );
     await migrateLegacyPhotos();
   } catch (error) {
     console.log(error);

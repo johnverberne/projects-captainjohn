@@ -19,7 +19,8 @@
     "test:node": "node --test --test-force-exit \"tests/unit/**/*.test.js\" \"tests/api/**/*.test.js\"",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "seed:e2e": "node scripts/seed-e2e.js"
+    "seed:e2e": "node scripts/seed-e2e.js",
+    "push:all": "node scripts/push-all.js"
   },
   "dependencies": {
     "argon2": "^0.44.0",
