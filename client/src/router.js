@@ -13,13 +13,13 @@ const router = createRouter({
       path: "/",
       name: "home",
       component: HomeView,
-      meta: { public: true },
+      meta: { public: true, wide: true },
     },
     {
       path: "/verkoop",
       name: "sales",
       component: SalesCornerView,
-      meta: { public: true, allowAuthed: true },
+      meta: { public: true, allowAuthed: true, wide: true },
     },
     {
       path: "/project/:id",
@@ -44,13 +44,13 @@ const router = createRouter({
       path: "/bewerken",
       name: "edit-home",
       component: HomeView,
-      meta: { requiresAuth: true, editMode: true },
+      meta: { requiresAuth: true, editMode: true, wide: true },
     },
     {
       path: "/bewerken/verkoop",
       name: "edit-sales",
       component: SalesCornerView,
-      meta: { requiresAuth: true, editMode: true },
+      meta: { requiresAuth: true, editMode: true, wide: true },
     },
     {
       path: "/bewerken/nieuw",
@@ -69,7 +69,9 @@ const router = createRouter({
       redirect: "/bewerken/nieuw",
     },
   ],
-  scrollBehavior() {
+  scrollBehavior(to, from) {
+    // Filters en zoeken schrijven naar de query; dan niet naar boven springen.
+    if (to.path === from.path) return false;
     return { top: 0 };
   },
 });

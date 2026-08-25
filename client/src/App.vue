@@ -1,9 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { health, listProjects } from "./api";
 import { useAuth } from "./auth";
 
+const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
 const mongoOk = ref(false);
@@ -13,6 +14,8 @@ const exportError = ref("");
 const homeLink = computed(() =>
   auth.isLoggedIn.value ? "/bewerken" : "/"
 );
+
+const wideLayout = computed(() => Boolean(route.meta.wide));
 
 onMounted(async () => {
   try {
@@ -73,7 +76,7 @@ async function onExport() {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'is-wide': wideLayout }">
     <header class="brand-bar">
       <router-link :to="homeLink" class="brand">
         Captain John

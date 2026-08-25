@@ -30,16 +30,19 @@ if (seeded.status !== 0) process.exit(seeded.status || 1);
 
 require("../server/loadEnv");
 const mongoose = require("mongoose");
+const { withDbSuffix } = require("../server/dbUri");
 const { createApp } = require("../server/createApp");
 
 const PORT = process.env.PORT || 5055;
-const mongoUri = process.env.MONGO_URI;
+const mongoUri = withDbSuffix(process.env.MONGO_URI, "e2e");
 
 async function main() {
   await mongoose.connect(mongoUri);
-  const app = createApp();
+  const app = createApp({ mongoUri, mongoSessionUri: mongoUri });
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`E2E server op http://127.0.0.1:${PORT}`);
+    console.log(
+      `E2E server op http://127.0.0.1:${PORT} (database ${mongoose.connection.name})`
+    );
   });
 }
 

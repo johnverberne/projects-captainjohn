@@ -3,6 +3,7 @@ require("../server/loadEnv");
 
 const mongoose = require("mongoose");
 const argon2 = require("argon2");
+const { withDbSuffix } = require("../server/dbUri");
 const User = require("../server/model/user.model");
 const Project = require("../server/model/project.model");
 
@@ -11,9 +12,11 @@ const password = process.env.E2E_PASSWORD || "e2e-pass-123";
 const name = process.env.E2E_NAME || "E2E Tester";
 
 async function main() {
-  const uri =
+  const uri = withDbSuffix(
     process.env.MONGO_URI ||
-    "mongodb://127.0.0.1:27017/project-captainjohn-e2e";
+      "mongodb://127.0.0.1:27017/project-captainjohn-e2e",
+    "e2e"
+  );
   await mongoose.connect(uri);
 
   await User.deleteMany({ email });

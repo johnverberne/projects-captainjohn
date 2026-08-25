@@ -33,6 +33,12 @@ function createApp(options = {}) {
     );
   }
 
+  if (!mongoSessionUri) {
+    throw new Error(
+      "MONGO_URI ontbreekt. Kopieer .env.example naar .env en vul de MongoDB-verbinding in."
+    );
+  }
+
   const app = express();
   app.set("trust proxy", 1);
 
