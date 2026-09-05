@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { health, listProjects } from "./api";
 import { useAuth } from "./auth";
+import FeedbackButton from "./components/FeedbackButton.vue";
 
 const router = useRouter();
 const auth = useAuth();
@@ -113,5 +114,6 @@ async function onExport() {
     </header>
     <p v-if="exportError" class="export-error">{{ exportError }}</p>
     <router-view />
+    <FeedbackButton />
   </div>
 </template>

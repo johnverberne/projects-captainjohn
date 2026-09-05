@@ -15,6 +15,12 @@ const ENDPOINTS = [
         auth: false,
         description: "Healthcheck (MongoDB, mode, client-build)",
       },
+      {
+        method: "GET",
+        path: "/api/config",
+        auth: false,
+        description: "Publieke runtime-config (o.a. URL van de feedback-app)",
+      },
     ],
   },
   {

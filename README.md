@@ -139,7 +139,11 @@ Ingelogd: knop **Export** in de topbalk. Client-side rapport (jsPDF) van alle pr
 Rollen: standaard editor; admin via `node scripts/make-admin.js iemand@example.com`.  
 Admin ziet alle prullenbak-items; anderen alleen eigen.
 
-### 12. Topbalk (App-shell)
+### 12. Feedback-knop
+
+Op elke pagina staat rechtsonder een knop **Feedback**. Die maakt een screenshot van het scherm en opent de aparte feedback-app (`FEEDBACK_APP_URL`, standaard http://localhost:5065). Daar vult de bezoeker een markdown-formulier in (radio, checkbox, vrije tekst). De reactie wordt als GitHub-issue op dit project gezet, inclusief screenshot.
+
+### 13. Topbalk (App-shell)
 
 - Merk **Captain John**
 - MongoDB-statusdot
@@ -239,6 +243,7 @@ npm run dev:vite              # API :5055 + Vite :5173
 | `ADMIN_EMAIL` | Goedkeuringen + interesse-mails |
 | `CREATE_SECRET` | Secrets in goedkeurlinks |
 | `SMTP_*` / `FROM_EMAIL` | Uitgaande mail |
+| `FEEDBACK_APP_URL` | URL van de feedback-app (screenshot + GitHub-issue) |
 
 Lokale logingegevens voor handmatig testen (niet committen): kopieer `.credentials.local.example.json` → `.credentials.local.json`. Dat bestand staat in `.gitignore`.
 
@@ -278,3 +283,4 @@ npm run test:e2e
 | Soft-delete / herstellen | — | ✓ |
 | PDF-export | — | ✓ |
 | Account aanvragen / login / reset | ✓ | — |
+| Feedback-knop (screenshot → GitHub-issue) | ✓ | ✓ |

@@ -82,6 +82,12 @@ function createApp(options = {}) {
     });
   });
 
+  app.get("/api/config", (_req, res) => {
+    res.json({
+      feedbackUrl: process.env.FEEDBACK_APP_URL || "",
+    });
+  });
+
   app.use("/api", apiDocsRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/projects", projectsRouter);

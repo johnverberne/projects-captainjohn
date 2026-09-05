@@ -36,6 +36,11 @@ describe("API: health, auth, projects", () => {
     assert.equal(res.body.mongo, "connected");
   });
 
+  it("GET /api/config geeft feedbackUrl", async () => {
+    const res = await request(app).get("/api/config").expect(200);
+    assert.equal(typeof res.body.feedbackUrl, "string");
+  });
+
   it("login en /api/auth/me", async () => {
     const login = await agent
       .post("/api/auth/login")

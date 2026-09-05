@@ -44,6 +44,7 @@ Legenda auth: **open** = geen login, **login** = sessie verplicht.
 |---|---|---|---|
 | GET | `/api` | login | API-overzichtspagina (HTML of JSON) |
 | GET | `/api/health` | open | Healthcheck (MongoDB, mode, client-build) |
+| GET | `/api/config` | open | Publieke runtime-config (o.a. URL van de feedback-app) |
 
 ### Auth
 

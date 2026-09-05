@@ -220,3 +220,7 @@ export function purgeProject(id) {
 export function health() {
   return request("/api/health");
 }
+
+export function getConfig() {
+  return request("/api/config");
+}
