@@ -141,7 +141,7 @@ Admin ziet alle prullenbak-items; anderen alleen eigen.
 
 ### 12. Feedback-knop
 
-Op elke pagina staat rechtsonder een knop **Feedback**. Die maakt een screenshot van het scherm en opent de aparte feedback-app (`FEEDBACK_APP_URL`, standaard http://localhost:5065). Daar vult de bezoeker een markdown-formulier in (radio, checkbox, vrije tekst). De reactie wordt als GitHub-issue op dit project gezet, inclusief screenshot.
+Op elke pagina staat rechtsonder een knop **Feedback**. Die vraagt om dit tabblad te delen (`getDisplayMedia`) en maakt daarmee een echte schermkopie. Als dat niet lukt, valt hij terug op een snelle viewport-tekening. Daarna opent de feedback-app (`FEEDBACK_APP_URL`). De bezoeker vult een markdown-formulier in; de reactie gaat naar GitHub/Codeberg/MongoDB, inclusief screenshot.
 
 ### 13. Topbalk (App-shell)
 

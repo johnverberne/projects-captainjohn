@@ -26,7 +26,72 @@ function isNearViewport(node) {
   return rect.bottom >= -margin && rect.top <= window.innerHeight + margin;
 }
 
-async function captureScreenshot() {
+function jpegFromCanvas(source, width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+async function captureTabPixels() {
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    throw new Error("Geen schermkopie-API");
+  }
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      displaySurface: "browser",
+      frameRate: 1,
+      width: { max: 1920 },
+      height: { max: 1080 },
+    },
+    audio: false,
+    preferCurrentTab: true,
+    selfBrowserSurface: "include",
+    systemAudio: "exclude",
+    surfaceSwitching: "exclude",
+    monitorTypeSurfaces: "exclude",
+  });
+  try {
+    const [track] = stream.getVideoTracks();
+    if (!track) throw new Error("Geen videobeeld");
+
+    if (typeof ImageCapture === "function") {
+      try {
+        const bitmap = await new ImageCapture(track).grabFrame();
+        const dataUrl = jpegFromCanvas(bitmap, bitmap.width, bitmap.height);
+        bitmap.close?.();
+        return dataUrl;
+      } catch {
+        /* fallback naar video-element */
+      }
+    }
+
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play();
+    if ("requestVideoFrameCallback" in video) {
+      await new Promise((resolve) => video.requestVideoFrameCallback(() => resolve()));
+    } else {
+      await new Promise((resolve) => {
+        if (video.readyState >= 2) resolve();
+        else video.onloadeddata = () => resolve();
+      });
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    return jpegFromCanvas(
+      video,
+      video.videoWidth || window.innerWidth,
+      video.videoHeight || window.innerHeight
+    );
+  } finally {
+    for (const track of stream.getTracks()) track.stop();
+  }
+}
+
+async function captureDomFallback() {
   const { toJpeg } = await import("html-to-image");
   const width = Math.round(window.innerWidth);
   const height = Math.round(window.innerHeight);
@@ -45,6 +110,23 @@ async function captureScreenshot() {
       overflow: "hidden",
     },
   });
+}
+
+async function captureScreenshot() {
+  const fab = document.querySelector(".feedback-fab");
+  if (fab) fab.style.visibility = "hidden";
+  try {
+    return await captureTabPixels();
+  } catch (e) {
+    if (e?.name === "NotAllowedError") {
+      console.warn("Schermdelen geweigerd, DOM-fallback");
+    } else {
+      console.warn("Schermkopie mislukt, DOM-fallback", e);
+    }
+    return captureDomFallback();
+  } finally {
+    if (fab) fab.style.visibility = "";
+  }
 }
 
 function writeScreenshotLoadingPage(doc) {
@@ -98,7 +180,7 @@ function writeScreenshotLoadingPage(doc) {
 <body>
   <div class="wrap" role="status" aria-live="polite">
     <div class="spinner" aria-hidden="true"></div>
-    <p>Zichtbaar scherm vastleggen…</p>
+    <p>Dit tabblad delen voor een schermkopie…</p>
   </div>
 </body>
 </html>`);
@@ -165,7 +247,7 @@ async function openFeedback() {
       type="button"
       class="feedback-fab-btn"
       :disabled="busy"
-      :title="busy ? 'Screenshot maken…' : 'Geef feedback over deze pagina'"
+      :title="busy ? 'Schermkopie maken…' : 'Geef feedback over deze pagina'"
       @click="openFeedback"
     >
       {{ busy ? "Bezig…" : "Feedback" }}
