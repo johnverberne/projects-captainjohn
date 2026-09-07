@@ -15,13 +15,35 @@ onMounted(async () => {
   }
 });
 
+function isNearViewport(node) {
+  if (!(node instanceof Element)) return true;
+  if (node.tagName !== "IMG" && node.tagName !== "VIDEO" && node.tagName !== "CANVAS") {
+    return true;
+  }
+  const rect = node.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return false;
+  const margin = 80;
+  return rect.bottom >= -margin && rect.top <= window.innerHeight + margin;
+}
+
 async function captureScreenshot() {
-  const { toPng } = await import("html-to-image");
-  return toPng(document.body, {
-    filter: (node) => !node.classList?.contains("feedback-fab"),
-    pixelRatio: Math.min(window.devicePixelRatio || 1, 1.25),
+  const { toJpeg } = await import("html-to-image");
+  const width = Math.round(window.innerWidth);
+  const height = Math.round(window.innerHeight);
+  return toJpeg(document.documentElement, {
+    filter: (node) =>
+      !node.classList?.contains("feedback-fab") && isNearViewport(node),
+    width,
+    height,
+    pixelRatio: 1,
+    quality: 0.72,
     backgroundColor: "#f3efe6",
-    cacheBust: true,
+    cacheBust: false,
+    skipFonts: true,
+    style: {
+      transform: `translate(${-window.scrollX}px, ${-window.scrollY}px)`,
+      overflow: "hidden",
+    },
   });
 }
 
@@ -76,7 +98,7 @@ function writeScreenshotLoadingPage(doc) {
 <body>
   <div class="wrap" role="status" aria-live="polite">
     <div class="spinner" aria-hidden="true"></div>
-    <p>Screenshot maken…</p>
+    <p>Zichtbaar scherm vastleggen…</p>
   </div>
 </body>
 </html>`);
