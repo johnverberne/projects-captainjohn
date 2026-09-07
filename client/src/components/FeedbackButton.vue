@@ -5,6 +5,7 @@ import { getConfig } from "../api";
 const feedbackUrl = ref("");
 const busy = ref(false);
 const error = ref("");
+const askConsent = ref(false);
 
 onMounted(async () => {
   try {
@@ -102,9 +103,21 @@ function writeScreenshotLoadingPage(doc) {
   doc.close();
 }
 
-async function openFeedback() {
+function openConsent() {
   if (!feedbackUrl.value || busy.value) return;
   error.value = "";
+  askConsent.value = true;
+}
+
+function closeConsent() {
+  if (busy.value) return;
+  askConsent.value = false;
+}
+
+async function openFeedback(includeScreenshot) {
+  if (!feedbackUrl.value || busy.value) return;
+  error.value = "";
+  askConsent.value = false;
   busy.value = true;
 
   const formWindow = window.open("about:blank", "_blank");
@@ -118,10 +131,12 @@ async function openFeedback() {
 
   try {
     let screenshot = "";
-    try {
-      screenshot = await captureScreenshot();
-    } catch (e) {
-      console.warn("Screenshot mislukt", e);
+    if (includeScreenshot) {
+      try {
+        screenshot = await captureScreenshot();
+      } catch (e) {
+        console.warn("Screenshot mislukt", e);
+      }
     }
 
     const res = await fetch(`${feedbackUrl.value}/api/intake`, {
@@ -162,10 +177,58 @@ async function openFeedback() {
       type="button"
       class="feedback-fab-btn"
       :disabled="busy"
-      :title="busy ? 'Zichtbaar scherm vastleggen…' : 'Geef feedback over deze pagina'"
-      @click="openFeedback"
+      :title="busy ? 'Feedback openen…' : 'Geef feedback over deze pagina'"
+      @click="openConsent"
     >
       {{ busy ? "Bezig…" : "Feedback" }}
     </button>
+  </div>
+
+  <div
+    v-if="askConsent"
+    class="interest-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="feedback-consent-title"
+    @click.self="closeConsent"
+  >
+    <div class="interest-panel stack">
+      <div class="interest-panel-head">
+        <h2 id="feedback-consent-title">Schermafbeelding meesturen?</h2>
+      </div>
+      <p class="lead">
+        Mag Captain John een afbeelding van het <strong>zichtbare scherm</strong>
+        meesturen bij je feedback? Zo is duidelijker waar het over gaat.
+      </p>
+      <p class="muted" style="margin: 0">
+        Zonder akkoord openen we het formulier zonder screenshot.
+      </p>
+      <div class="actions">
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="busy"
+          @click="openFeedback(true)"
+        >
+          Ja, stuur schermafbeelding mee
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          :disabled="busy"
+          @click="openFeedback(false)"
+        >
+          Nee, alleen het formulier
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          :disabled="busy"
+          @click="closeConsent"
+        >
+          Annuleren
+        </button>
+      </div>
+    </div>
   </div>
 </template>

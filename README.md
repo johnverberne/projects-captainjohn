@@ -141,7 +141,7 @@ Admin ziet alle prullenbak-items; anderen alleen eigen.
 
 ### 12. Feedback-knop
 
-Op elke pagina staat rechtsonder een knop **Feedback**. Die legt met html2canvas alleen het **zichtbare scherm** vast (geen hele pagina, geen tabblad-delen) en opent de feedback-app (`FEEDBACK_APP_URL`). De bezoeker vult een markdown-formulier in; de reactie gaat naar GitHub/Codeberg/MongoDB, inclusief screenshot.
+Op elke pagina staat rechtsonder een knop **Feedback**. Eerst vraagt een dialoog of een afbeelding van het **zichtbare scherm** mee mag. Bij akkoord legt html2canvas dat vast; anders gaat alleen het formulier mee. Daarna opent de feedback-app (`FEEDBACK_APP_URL`). De reactie gaat naar GitHub/Codeberg/MongoDB.
 
 ### 13. Topbalk (App-shell)
 
