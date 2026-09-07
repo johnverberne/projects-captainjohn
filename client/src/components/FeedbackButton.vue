@@ -25,6 +25,64 @@ async function captureScreenshot() {
   });
 }
 
+function writeScreenshotLoadingPage(doc) {
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Feedback…</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f3efe6;
+      color: #1a3a3a;
+      font-family: Soleil, system-ui, sans-serif;
+    }
+    .wrap {
+      box-sizing: border-box;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.1rem;
+      padding: 2rem;
+    }
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 3px solid rgba(26, 58, 58, 0.14);
+      border-top-color: #b85c38;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    p {
+      margin: 0;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation: none; border-top-color: #1a3a3a; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" role="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <p>Screenshot maken…</p>
+  </div>
+</body>
+</html>`);
+  doc.close();
+}
+
 async function openFeedback() {
   if (!feedbackUrl.value || busy.value) return;
   error.value = "";
@@ -33,9 +91,7 @@ async function openFeedback() {
   const formWindow = window.open("about:blank", "_blank");
   if (formWindow?.document) {
     try {
-      formWindow.document.title = "Feedback…";
-      formWindow.document.body.innerHTML =
-        '<p style="font-family: Soleil, system-ui, sans-serif; padding: 2rem; color: #1a3a3a;">Screenshot maken…</p>';
+      writeScreenshotLoadingPage(formWindow.document);
     } catch {
       /* ignore */
     }
