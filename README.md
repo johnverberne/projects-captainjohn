@@ -141,7 +141,7 @@ Admin ziet alle prullenbak-items; anderen alleen eigen.
 
 ### 12. Feedback-knop
 
-Op elke pagina staat rechtsonder een knop **Feedback**. Die vraagt om dit tabblad te delen (`getDisplayMedia`) en maakt daarmee een echte schermkopie. Als dat niet lukt, valt hij terug op een snelle viewport-tekening. Daarna opent de feedback-app (`FEEDBACK_APP_URL`). De bezoeker vult een markdown-formulier in; de reactie gaat naar GitHub/Codeberg/MongoDB, inclusief screenshot.
+Op elke pagina staat rechtsonder een knop **Feedback**. Die legt met html2canvas alleen het **zichtbare scherm** vast (geen hele pagina, geen tabblad-delen) en opent de feedback-app (`FEEDBACK_APP_URL`). De bezoeker vult een markdown-formulier in; de reactie gaat naar GitHub/Codeberg/MongoDB, inclusief screenshot.
 
 ### 13. Topbalk (App-shell)
 
