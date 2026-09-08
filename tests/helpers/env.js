@@ -1,5 +1,6 @@
 const path = require("path");
 const dotenv = require("dotenv");
+const { withDbSuffix } = require("../../server/dbUri");
 
 process.env.NODE_ENV = "test";
 process.env.ALLOW_NO_CLIENT = "true";
@@ -13,11 +14,7 @@ if (!process.env.MONGO_URI) {
 }
 
 function toTestUri(uri) {
-  if (!uri) return uri;
-  return String(uri).replace(
-    /\/project-captainjohn(\?|$)/,
-    "/project-captainjohn-test$1"
-  );
+  return withDbSuffix(uri, "test");
 }
 
 if (process.env.MONGO_URI) {
@@ -26,5 +23,8 @@ if (process.env.MONGO_URI) {
   process.env.MONGO_URI =
     "mongodb://127.0.0.1:27017/project-captainjohn-test";
 }
-process.env.MONGO_SESSION_URI =
-  process.env.MONGO_SESSION_URI || process.env.MONGO_URI;
+// Ook een expliciete sessie-URI moet naar de testdatabase, anders schrijven
+// tests in de echte database.
+process.env.MONGO_SESSION_URI = process.env.MONGO_SESSION_URI
+  ? toTestUri(process.env.MONGO_SESSION_URI)
+  : process.env.MONGO_URI;

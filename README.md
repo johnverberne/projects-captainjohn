@@ -238,6 +238,7 @@ npm run dev:vite              # API :5055 + Vite :5173
 | `MONGO_URI` / `MONGO_SESSION_URI` | Database / sessies |
 | `SESSION_SECRET` | Sessies ondertekenen |
 | `PORT` | Standaard `5055` |
+| `E2E_PORT` | Poort voor de Playwright-testserver, standaard `5056` |
 | `DEV` | Dev-gedrag / Mongo-debug |
 | `COOKIE_SECURE` | `true` op HTTPS (Railway) |
 | `ADMIN_EMAIL` | Goedkeuringen + interesse-mails |
@@ -257,7 +258,7 @@ GitHub Actions bij elke **push** en **pull request** (MongoDB 7, Node 22):
 - API: health, auth, projecten, foto’s, hoofdfoto/volgorde  
 - Playwright E2E (“film” met video-artifact)
 
-Lokaal (MongoDB op `127.0.0.1:27017`):
+Lokaal:
 
 ```bash
 npm run build
@@ -265,6 +266,14 @@ npm run test:node
 npx playwright install chromium
 npm run test:e2e
 ```
+
+Zonder `MONGO_URI` gaan de tests naar MongoDB op `127.0.0.1:27017`. Staat er wel een
+`MONGO_URI` in `.env` (bijvoorbeeld naar Atlas), dan gebruiken de tests dezelfde
+cluster maar **nooit** de echte database: `project-captainjohn` wordt automatisch
+`project-captainjohn-test` (unit/API) of `project-captainjohn-e2e` (Playwright).
+
+De e2e-server draait op zijn eigen poort (`5056`, aan te passen met `E2E_PORT`), zodat
+Playwright niet per ongeluk een lokale dev-server op `PORT` hergebruikt.
 
 ---
 

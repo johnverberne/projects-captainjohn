@@ -6,6 +6,8 @@ const PROJECT_TYPES = [
   "tiffany",
   "glas-in-lood",
   "hout",
+  "cnc",
+  "3d-print",
   "keramiek",
   "tassen",
   "overige",

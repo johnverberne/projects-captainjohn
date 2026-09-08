@@ -3,6 +3,8 @@ export const TYPE_LABELS = {
   tiffany: "Tiffany",
   "glas-in-lood": "Glas in lood",
   hout: "Hout",
+  cnc: "CNC",
+  "3d-print": "3D print",
   keramiek: "Keramiek",
   tassen: "Tassen",
   overige: "Overige",
@@ -77,6 +79,31 @@ export function isPublicPhoto(photo) {
 
 export function publicPhotos(project) {
   return (project?.photos || []).filter(isPublicPhoto);
+}
+
+/** Doorzoekbare tekst van een project; notities zijn alleen voor editors. */
+export function projectSearchText(project, { includeInternal = false } = {}) {
+  const parts = [
+    project?.saleTitle,
+    project?.title,
+    project?.saleDescription,
+    typeLabel(project?.type),
+    saleStatusLabel(project?.saleStatus),
+    ...(project?.labels || []).map((label) => label?.name),
+  ];
+  if (includeInternal) parts.push(project?.notes);
+  return parts.filter(Boolean).join(" ").toLowerCase();
+}
+
+/** Alle losse woorden uit de zoekterm moeten voorkomen. */
+export function matchesQuery(project, query, options) {
+  const terms = String(query || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!terms.length) return true;
+  const haystack = projectSearchText(project, options);
+  return terms.every((term) => haystack.includes(term));
 }
 
 export function emptyFiringSegment() {
@@ -186,6 +213,16 @@ export function formatDate(value) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+/** Datum zonder tijd, voor projectkaarten. */
+export function formatDateShort(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString("nl-NL", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
   });
 }
 

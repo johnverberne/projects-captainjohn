@@ -106,24 +106,26 @@ onMounted(load);
       </p>
     </div>
 
-    <div class="choice-grid sales-filters">
+    <div class="filter-row sales-filters" role="group" aria-label="Filter op verkoopstatus">
       <button
         type="button"
-        class="choice"
-        :class="{ active: filter === 'all' }"
+        class="chip"
+        :aria-pressed="filter === 'all'"
         @click="filter = 'all'"
       >
-        Alles ({{ counts.all }})
+        Alles
+        <span class="chip-count">{{ counts.all }}</span>
       </button>
       <button
         v-for="status in SALE_STATUSES"
         :key="status"
         type="button"
-        class="choice"
-        :class="{ active: filter === status }"
+        class="chip"
+        :aria-pressed="filter === status"
         @click="filter = status"
       >
-        {{ SALE_STATUS_LABELS[status] }} ({{ counts[status] }})
+        {{ SALE_STATUS_LABELS[status] }}
+        <span class="chip-count">{{ counts[status] }}</span>
       </button>
     </div>
 
